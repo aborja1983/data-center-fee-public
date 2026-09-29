@@ -12,8 +12,8 @@ Both are self-contained: no build step, no dependencies, and no network access a
 
 ## The full versions
 
-The two pages above hold most assumptions fixed. The full tools expose every one of them as a
-control, and attach a source and a confidence tier to each figure on screen:
+The two pages above keep most assumptions fixed. The full tools turn every one of them into a
+control you can move, and show the source and confidence tier for each figure on screen:
 
 - **[By state, full version](data-center-tax-tool-by-state.html)**
 - **[By grid region, full version](data-center-tax-tool.html)**
@@ -22,9 +22,8 @@ control, and attach a source and a confidence tier to each figure on screen:
 
 The derivation scripts and the raw source documents are not in this repository — the model is
 developed in a separate working repository, where every figure is re-derived by running a script
-that must reproduce its committed output byte for byte. So what is here supports **checking** a
-number, not re-deriving it. That distinction is the honest one, and these three files are enough for
-the first job:
+that must reproduce its committed output byte for byte. What is here lets you check a figure. It will not
+let you re-derive one. These three files cover the first of those:
 
 | file | what it gives you |
 |---|---|
@@ -32,10 +31,10 @@ the first job:
 | **[CITATIONS.md](CITATIONS.md)** · **[by state](CITATIONS-by-state.md)** | every number in each tool mapped to its source document and locator, plus what that number does in the model |
 | **[SOURCES.md](SOURCES.md)** | an inventory of every primary document the model is built on — publisher, size, and which figures derive from it |
 
-All three are generated and gated, never kept by hand — the two citation manifests from the tools'
-own citation arrays, the inventory from the source tree itself — so they cannot quietly disagree
-with what the pages display. Some rows cite `files/METHODOLOGY.md`, which records a derivation in
-full and is not published here.
+None of the three is kept by hand. The two citation manifests are generated from the tools' own
+citation arrays and the inventory from the source tree, and an automated check fails if any of them
+stops matching what the pages display. Some rows cite `files/METHODOLOGY.md`, which records a
+derivation in full and is not published here.
 
 ## Where the numbers come from
 
@@ -47,21 +46,23 @@ full and is not published here.
 | **dcmap.us** | data center buildout pipeline — state aggregates, data as of 2026-08-31 |
 | **Global Energy Monitor** | unit-level gas plants, for generation inside the fence |
 
-A figure is only as current as the vintage beside it. The publication date above is when these
-pages were built, not when the underlying data was collected — the buildout pipeline is the one
-that moves fastest, and it is a 2026-08-31 snapshot.
+Each figure is current as of the vintage beside it. The publication date at the top of this page is
+the date the pages were built; it says nothing about when the data underneath was collected. The
+buildout pipeline moves fastest of the five, and it is a snapshot taken 2026-08-31.
 
 The 6% and 10% energy-burden thresholds are **ACEEE's**, applied to DOE LEAD's data. DOE's own LEAD
 pages define only the 6% threshold and no 10% severe threshold.
 
-Four figures in the model are not sourced, and the full tool says so on screen: three are modeling
-dials no source could settle, and the fourth records that no source quantifies behind-the-meter
-renewable capacity at US data centers — a searched-and-not-found result.
+Four figures in the model have no source, and the full tool says so on screen. Three are modeling
+dials that no source could settle, because they are the assumptions a reader is meant to choose. The
+fourth records that no source quantifies behind-the-meter renewable capacity at US data centers.
+That was searched for and not found, which is a result in itself.
 
 ## Every file here is generated
 
-Nothing in this repository is edited in place. It is written out of the working repository by an
-export script against an explicit manifest, and a gate fails if the two diverge or if a file appears
-here that is not on the manifest. **Do not edit these files** — the next export would overwrite
-them. The calculation is not duplicated either: both public pages carry one `computeScenario`, taken
-verbatim from the tool it belongs to, and a separate gate fails if that copy drifts.
+Every file here is written out of the working repository by an export script, against an explicit
+manifest. An automated check fails if the two copies diverge, and also if a file turns up here that
+the manifest does not list. **Do not edit these files.** The next export would overwrite them.
+
+The calculation exists once. Both public pages carry the same `computeScenario`, copied verbatim from
+the tool it belongs to, and a second check fails if that copy drifts.
