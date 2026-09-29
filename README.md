@@ -23,7 +23,7 @@ control, and attach a source and a confidence tier to each figure on screen:
 The derivation scripts and the raw source documents are not in this repository — the model is
 developed in a separate working repository, where every figure is re-derived by running a script
 that must reproduce its committed output byte for byte. So what is here supports **checking** a
-number, not re-deriving it. That distinction is the honest one, and these four files are enough for
+number, not re-deriving it. That distinction is the honest one, and these three files are enough for
 the first job:
 
 | file | what it gives you |
@@ -31,11 +31,11 @@ the first job:
 | **[MASTER-DATA.csv](MASTER-DATA.csv)** | 420 rows, one per figure displayed anywhere: its value, confidence tier, citation, caveats, and **the script that produced it**. Opens in a spreadsheet. Start here. |
 | **[CITATIONS.md](CITATIONS.md)** · **[by state](CITATIONS-by-state.md)** | every number in each tool mapped to its source document and locator, plus what that number does in the model |
 | **[SOURCES.md](SOURCES.md)** | an inventory of every primary document the model is built on — publisher, size, and which figures derive from it |
-| **[METHODOLOGY.md](METHODOLOGY.md)** | the end-to-end derivation of every figure, and a running log of errors found and corrected |
 
-All four are generated from the tools themselves and checked by an automated gate, never kept by
-hand, so they cannot quietly disagree with what the pages display. METHODOLOGY.md refers in places
-to `CLAUDE.md`, the working rules the project is built under; that file is not published here.
+All three are generated and gated, never kept by hand — the two citation manifests from the tools'
+own citation arrays, the inventory from the source tree itself — so they cannot quietly disagree
+with what the pages display. Some rows cite `files/METHODOLOGY.md`, which records a derivation in
+full and is not published here.
 
 ## Where the numbers come from
 
