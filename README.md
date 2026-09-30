@@ -5,8 +5,8 @@ Two pages modeling a per-kilowatt-hour **fee** on electricity used by data cente
 
 By Anais. Published 2026-09-29.
 
-- **[By state](public-by-state.html)** — all 50 states plus DC
-- **[By grid region](public-by-region.html)** — 24 RTO, ISO and utility territories
+**[Open the site](public.html)** — 51 states and DC, and 24 RTO, ISO and utility territories, in
+one page. Choosing Ohio and choosing PJM are the same act in the same place.
 
 Both are self-contained: no build step, no dependencies, and no network access at runtime.
 
