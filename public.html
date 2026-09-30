@@ -152,6 +152,47 @@ button.ghost:hover{border-color:var(--ink-3);color:var(--ink)}
 .frame strong{color:var(--ink)}
 .note{border-left:2px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;
   padding:13px 15px;margin-top:20px;font-size:.9rem;color:var(--ink-2)}
+
+/* ---- print ------------------------------------------------------------------------
+   Browsers do not print background colours, deliberately, so the black ground disappears
+   and the page arrives on white. Text colours ARE printed as written, so without this
+   block --ink #e8ecf2 lands as near-white on white and the sheet is legible only if you
+   select it. Redefining the tokens flips the whole page, because everything reads them.
+
+   The footer is the part that earns this block. A printed or pasted "$133.71" otherwise
+   carries no conditions: not the jurisdiction, not the fee, not the ratio, not who
+   receives it -- all of which the reader chose and any of which changes the figure.
+   Printing is the moment a number gets separated from its assumptions. */
+/* Carried on every screen render, shown only on paper. Declared BEFORE the print block on
+   purpose: both selectors are a single id, so source order decides, and with this rule after
+   the block it silently beat `#printFoot{display:block}` and nothing printed. */
+#printFoot{display:none}
+#printFoot .pf-set{color:#2b2f36;line-height:1.6}
+#printFoot .pf-src{color:#6b7078;margin-top:5px}
+
+@media print{
+  :root{
+    --bg:#fff; --panel:#fff; --panel-2:#fff; --line:#d8d9dc;
+    --ink:#14161a; --ink-2:#2b2f36; --ink-3:#6b7078;
+    --accent:#1d6b48; --accent-soft:#f3f5f4;
+  }
+  @page{margin:16mm}
+  body{background:#fff}
+  .wrap{max-width:none;padding:0}
+  /* Controls, navigation and the step you are not looking at mean nothing on paper. */
+  #progress, .nav, .toplinks, #search, #places, .chips, input[type=range], #eligOpts{display:none !important}
+  .step:not(.on){display:none}
+  #answer .big{color:#0d1014}
+  .frame, .card{border:1px solid #d8d9dc;break-inside:avoid;page-break-inside:avoid}
+  .note{border-left:2px solid #1d6b48;background:#f3f5f4}
+  .drow{break-inside:avoid;page-break-inside:avoid}
+  h1,h2,.q{color:#0d1014}
+  a{color:inherit;text-decoration:underline}
+  #printFoot{display:block}
+  #foot{display:none}
+}
+
+
 .note a{color:var(--accent);font-weight:600;text-decoration:none}
 .note a:hover{text-decoration:underline}
 .scenario{border-left:2px solid var(--warn);background:#2a2113;border-radius:0 8px 8px 0;
@@ -240,6 +281,7 @@ footer a{color:var(--ink-2)}
   <div class="frame" id="frameBox"></div>
   <div class="frame" id="decarbBox" hidden></div>
   <p class="note" id="deeper"></p>
+  <div id="printFoot" aria-hidden="true"></div>
   <div class="nav restart"><button class="ghost" data-back>Back</button>
     <span class="spacer"></span><button class="ghost" id="restart">Start again</button></div>
 </section>
@@ -5210,6 +5252,7 @@ function paintAnswer(){
   document.getElementById('frameBox').innerHTML = parts.join('');
 
   paintDecarb();
+  paintPrintFooter();
 
   document.getElementById('deeper').innerHTML =
     'Every figure here is derived from published data and is cited, line by line, in the full ' +
@@ -5236,6 +5279,38 @@ function go(n){
   var bars = document.querySelectorAll('#progress span');
   for(var j = 0; j < bars.length; j++) bars[j].classList.toggle('done', j <= S.step);
   window.scrollTo({ top: 0, behavior: S.step === 0 ? 'auto' : 'smooth' });
+}
+
+/* ---- the provenance line a printout carries ----------------------------
+   Hidden on screen, printed on paper. Everything here comes off S and R(), so it cannot
+   disagree with the figure above it, and there is no vintage hand-typed into it that
+   could go stale -- the full tool is where every number is cited, and this says so. */
+function paintPrintFooter(){
+  var el = document.getElementById('printFoot');
+  if(!el) return;
+  var r = R();
+  var ELIG = {
+    'burdened':   'households spending more than 6% of their income on energy',
+    'all-tiered': 'every household, double for those above 6%',
+    'all-equal':  'every household, the same amount'
+  };
+  /* Resolve the null the same way input() does. Reading S.buildout raw printed "0 MW" whenever the
+     buildout step had not set it, while the figure above was computed from the scenario default --
+     the footer contradicting the number it exists to explain. */
+  var bo = (S.buildout === null ? r.scenarios[1].value : S.buildout);
+  var mw = intf(bo * (r.unitToMW || 1)) + ' MW';
+  var fee = (S.fee === null ? TAX_TIERS.moderate.fossilCents : S.fee).toFixed(2) + '\u00a2';
+  var when;
+  try {
+    when = new Date().toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+  } catch(e){ when = new Date().toDateString(); }
+  el.innerHTML =
+    '<p class="pf-set"><strong>' + esc(r.name) + '</strong> \u00b7 fee <strong>' + fee +
+      '</strong> per fossil kWh \u00b7 fossil:clean <strong>' + fmtRatio(S.ratio) +
+      '</strong> \u00b7 buildout <strong>' + mw + '</strong> \u00b7 paid to <strong>' +
+      esc(ELIG[S.eligibility] || S.eligibility) + '</strong></p>' +
+    '<p class="pf-src">Change any of those and the figure changes. Every number above is cited, ' +
+      'line by line, in the full version of this tool. Printed ' + esc(when) + '.</p>';
 }
 
 /* ---- what a cleaner grid does to the payment ----------------------------
