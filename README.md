@@ -23,18 +23,23 @@ control you can move, and show the source and confidence tier for each figure on
 The derivation scripts and the raw source documents are not in this repository — the model is
 developed in a separate working repository, where every figure is re-derived by running a script
 that must reproduce its committed output byte for byte. What is here lets you check a figure. It will not
-let you re-derive one. These three files cover the first of those:
+let you re-derive one. These four files cover the first of those:
 
 | file | what it gives you |
 |---|---|
 | **[MASTER-DATA.csv](MASTER-DATA.csv)** | 420 rows, one per figure displayed anywhere: its value, confidence tier, citation, caveats, and **the script that produced it**. Opens in a spreadsheet. Start here. |
 | **[CITATIONS.md](CITATIONS.md)** · **[by state](CITATIONS-by-state.md)** | every number in each tool mapped to its source document and locator, plus what that number does in the model |
 | **[SOURCES.md](SOURCES.md)** | an inventory of every primary document the model is built on — publisher, size, and which figures derive from it |
+| **[METHODOLOGY.md](METHODOLOGY.md)** | how each figure is derived, end to end. Section 6 is a log of the errors this process caught, and what was done about each |
 
-None of the three is kept by hand. The two citation manifests are generated from the tools' own
+The first three are not kept by hand. The two citation manifests are generated from the tools' own
 citation arrays and the inventory from the source tree, and an automated check fails if any of them
-stops matching what the pages display. Some rows cite `files/METHODOLOGY.md`, which records a
-derivation in full and is not published here.
+stops matching what the pages display.
+
+METHODOLOGY.md is written by hand, and it names files that are not published here — the derivation
+scripts, the expected-result tables, the automated checks. Where it does, it is citing a check that
+exists in the working repository rather than offering you a file to open. Its section 2 says which
+is which.
 
 ## Where the numbers come from
 
