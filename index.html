@@ -78,6 +78,19 @@ p.sub{color:var(--ink-2);margin:0 0 22px;font-size:1rem}
 #places .grouphead .sm{display:block;margin-top:3px;font-size:.8rem;font-weight:400;
   text-transform:none;letter-spacing:0;color:var(--ink-3)}
 
+/* ---- the decarbonization panel ---------------------------------------- */
+.dhead{font-size:.74rem;font-weight:650;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--ink-3);margin:0 0 8px}
+.drow{display:flex;align-items:baseline;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+.drow:first-of-type{border-top:0}
+.drow .dlab{flex:1 1 auto;min-width:0}
+.drow .dval{flex:0 0 auto;font-weight:650;font-variant-numeric:tabular-nums}
+.drow .ddelta{flex:0 0 auto;font-size:.82rem;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;min-width:74px;text-align:right}
+.drow .dnote{display:block;font-size:.8rem;color:var(--ink-3);margin-top:2px}
+.drow.dnow{background:var(--accent-soft);border-radius:8px;padding-left:10px;padding-right:10px;
+  margin:0 -10px}
+
 /* ---- controls -------------------------------------------------------- */
 .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
   padding:18px 18px 20px;margin-bottom:16px}
@@ -212,6 +225,7 @@ footer a{color:var(--ink-2)}
   <h2 class="q" id="answerHead">What a household would receive</h2>
   <div id="answer" class="two"></div>
   <div class="frame" id="frameBox"></div>
+  <div class="frame" id="decarbBox" hidden></div>
   <p class="note" id="deeper"></p>
   <div class="nav restart"><button class="ghost" data-back>Back</button>
     <span class="spacer"></span><button class="ghost" id="restart">Start again</button></div>
@@ -2985,7 +2999,8 @@ function headlineDistribution(input){
            CPI_DEFAULT: CPI_DEFAULT,
            LIHEAP_MONTHLY: LIHEAP_MONTHLY,
            computeScenario: computeScenario,
-           headlineDistribution: headlineDistribution };
+           headlineDistribution: headlineDistribution,
+           btmShareFor: btmShareFor };
 })();
 
 MODELS.region = (function(){
@@ -4846,7 +4861,8 @@ function headlineDistribution(input){
            CPI_DEFAULT: CPI_DEFAULT,
            LIHEAP_MONTHLY: LIHEAP_MONTHLY,
            computeScenario: computeScenario,
-           headlineDistribution: headlineDistribution };
+           headlineDistribution: headlineDistribution,
+           btmShareFor: btmShareFor };
 })();
 
 /* ===== END INJECTED CORE ======================================================== */
@@ -4866,7 +4882,8 @@ var CFG = {
       "expertHref": "data-center-tax-tool-by-state.html",
       "groupLabel": "States",
       "groupNote": "Each state\u2019s own figures, with no crosswalk.",
-      "noun": "state"
+      "noun": "state",
+      "sortByName": true
     }
   },
   "openingSub": "Data centers use enormous amounts of electricity. This asks what would happen if they paid a small fee on every kilowatt-hour, and the money went to households that spend the most of their income on energy. Start by choosing where.",
@@ -4889,7 +4906,7 @@ var CFG = {
    through MODELS[...] here would break that guard, and a guard that has to be
    rewritten to accommodate a change has stopped testing the change. */
 var REGIONS, REGION_ORDER, DEFAULTS, TAX_TIERS, CPI_DEFAULT, LIHEAP_MONTHLY,
-    computeScenario, headlineDistribution;
+    computeScenario, headlineDistribution, btmShareFor;
 
 var MODE_ORDER = ['state', 'region'];
 
@@ -4900,6 +4917,7 @@ function useModel(mode){
   REGIONS = M.REGIONS; REGION_ORDER = M.REGION_ORDER; DEFAULTS = M.DEFAULTS;
   TAX_TIERS = M.TAX_TIERS; CPI_DEFAULT = M.CPI_DEFAULT; LIHEAP_MONTHLY = M.LIHEAP_MONTHLY;
   computeScenario = M.computeScenario; headlineDistribution = M.headlineDistribution;
+  btmShareFor = M.btmShareFor;
 }
 
 /* Every place a reader can choose, both groups, flattened once at load. A jurisdiction with
@@ -4914,6 +4932,17 @@ var PLACES = (function(){
       if(!x || !x.scenarios) return;
       out.push({ mode: mode, key: k, name: x.name, households: x.households });
     });
+    /* The canonical tool orders states by when they were added -- New Mexico and Virginia were the
+       two pilots, then four more. That is build history, and inside the expert tool it is meaningful.
+       On a page a reader scans for their own state it is six names floating above an alphabetical
+       list with nothing to say why. The regions keep their order, which is roughly by size and reads
+       as deliberate. */
+    if(CFG.modes[mode] && CFG.modes[mode].sortByName){
+      out.sort(function(a, b){
+        if(a.mode !== b.mode) return 0;
+        return a.name.localeCompare(b.name);
+      });
+    }
   });
   return out;
 })();
@@ -4977,6 +5006,10 @@ function input(){
   };
 }
 function res(){ return computeScenario(input()); }
+/* Deliberately after res(): render-check.js lifts everything between R() and res() out of this page
+   and evaluates it with four parameters, so anything added in that span has to be satisfiable from
+   those four. This needs input() itself. */
+function inputWith(o){ var i = input(); for(var k in o) i[k] = o[k]; return i; }
 function nameList(a){
   if(!a.length) return '';
   if(a.length === 1) return a[0];
@@ -5160,6 +5193,8 @@ function paintAnswer(){
   }
   document.getElementById('frameBox').innerHTML = parts.join('');
 
+  paintDecarb();
+
   document.getElementById('deeper').innerHTML =
     'Every figure here is derived from published data and is cited, line by line, in the full ' +
     'version of this tool — which also lets you change the assumptions held fixed here, and shows ' +
@@ -5185,6 +5220,83 @@ function go(n){
   var bars = document.querySelectorAll('#progress span');
   for(var j = 0; j < bars.length; j++) bars[j].classList.toggle('done', j <= S.step);
   window.scrollTo({ top: 0, behavior: S.step === 0 ? 'auto' : 'smooth' });
+}
+
+/* ---- what a cleaner grid does to the payment ----------------------------
+   The sharpest question in the model, and one the figure above cannot answer by itself. The fee
+   charges a fossil kilowatt-hour more than a clean one, so a grid that cleans up is a grid paying
+   the fee on fewer of them: left alone the dividend shrinks, and a household ends up with a reason
+   to want a dirty grid.
+
+   This shows all three rules rather than offering a control to pick between them. At today's grid
+   mix the three produce an IDENTICAL figure -- the rate multiplier is (1+ref)/(1+mix) raised to k,
+   and ref equals mix today, so it is 1 whatever k is. A control that cannot move the number it sits
+   beside reads as broken, not as subtle. They separate only at a different grid, which is the whole
+   point, so the panel goes to a fully clean grid and shows where each one lands. */
+function paintDecarb(){
+  var box = document.getElementById('decarbBox');
+  var r = R(), x = res();
+  var pick = function(c){ return c.severePayable ? c.severeMonthly : c.moderateMonthly; };
+  var now = pick(x);
+  /* Nothing to say where the fee raises nothing: the five states with no tracked pipeline would
+     otherwise get three rows of $0.00 and a paragraph about a trade-off they do not face. */
+  if(now === null || !isFinite(now) || now <= 0){ box.hidden = true; return; }
+
+  var RULES = [
+    { k: 0, lab: 'Left alone',
+      note: 'The rate never changes, so the fee collects less as the grid cleans.' },
+    { k: 1, lab: 'Held steady',
+      note: 'The rate rises just enough to offset what the grid stops paying.' },
+    { k: 2, lab: 'Indexed to reward decarbonization',
+      note: 'The rate rises faster than the grid cleans, so the dividend grows.' }
+  ];
+  var ok = true;
+  RULES.forEach(function(o){
+    try {
+      o.v = pick(computeScenario(inputWith({ gridIndexing: o.k, gridMixNow: 0, fossilShare: 0 })));
+    } catch(e){ o.v = null; }
+    if(o.v === null || !isFinite(o.v)) ok = false;
+  });
+  if(!ok){ box.hidden = true; return; }
+
+  /* Which rule the figure above was worked out under. DEFAULTS is the canonical tool's, so this
+     follows the tool rather than restating it. */
+  var live = Number(DEFAULTS.gridIndexing);
+
+  var gas = 0;
+  try { gas = Number(btmShareFor(r, 'low')) || 0; } catch(e){ gas = 0; }
+
+  var rows = RULES.map(function(o){
+    var d = (o.v / now) - 1;
+    var delta = Math.abs(d) < 0.005 ? 'about the same'
+              : (d > 0 ? '+' : '\u2212') + Math.round(Math.abs(d) * 100) + '%';
+    var note = o.note;
+    /* "Held steady" is exactly steady only where no data center burns its own gas. That gas pays
+       the fossil rate whatever the grid does, so indexing lifts it too and the total creeps up.
+       Saying "holds" against a number that visibly rose would be the sentence contradicting the
+       figure beside it. */
+    if(o.k === 1 && Math.abs(d) >= 0.005)
+      note += ' It rises a little here because ' + (gas > 0
+        ? '<strong>' + (gas * 100).toFixed(1) + '%</strong> of this load is data centers burning ' +
+          'their own gas on site, which pays the fossil rate whatever the grid does'
+        : 'some of this load is generated on site') + '.';
+    return '<div class="drow' + (o.k === live ? ' dnow' : '') + '">' +
+      '<span class="dlab">' + esc(o.lab) + (o.k === live ? ' \u2014 used above' : '') +
+        '<span class="dnote">' + note + '</span></span>' +
+      '<span class="dval">' + money(o.v) + '</span>' +
+      '<span class="ddelta">' + delta + '</span></div>';
+  }).join('');
+
+  box.hidden = false;
+  box.innerHTML =
+    '<p class="dhead">What happens as the grid cleans up</p>' +
+    '<p>A clean kilowatt-hour pays ' + ratioWords(S.ratio) + ' as a fossil one, so as ' +
+      esc(r.name) + '\u2019s grid decarbonizes fewer kilowatt-hours pay the higher rate. Left alone ' +
+      'the fee collects less every year, and the dividend falls with it \u2014 which would hand ' +
+      'households a reason to want a dirty grid.</p>' +
+    '<p>The figure above is the same under all three rules, because it is worked out at ' +
+      esc(r.name) + '\u2019s grid as it stands today. They separate only later. If the grid went ' +
+      'fully clean, that household would get:</p>' + rows;
 }
 
 document.addEventListener('click', function(e){
