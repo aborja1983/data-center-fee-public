@@ -3,8 +3,8 @@
      Both calculation cores below are copied verbatim from the canonical tools;
      edit them there. -->
 
-<!-- TEMPLATE. build-public.py injects the calculation core and a per-tool config into this shell
-     and writes public-by-state.html / public-by-region.html. Nothing here is served directly.
+<!-- TEMPLATE. build-public.py injects both calculation cores and the config into this shell and
+     writes public.html. Nothing here is served directly.
 
      WHY A SHELL RATHER THAN A FILTERED COPY OF THE EXPERT TOOL. The public site was a copy of the
      expert file with sections hidden, which read like an instrument with its panels closed: 5,489
@@ -21,6 +21,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>What a data center fee would pay your household</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%277%27%20fill%3D%27%232f9e6b%27%2F%3E%3Crect%20x%3D%2710.2%27%20y%3D%276%27%20width%3D%274.2%27%20height%3D%2710%27%20rx%3D%272.1%27%20fill%3D%27%230d1014%27%2F%3E%3Crect%20x%3D%2717.6%27%20y%3D%276%27%20width%3D%274.2%27%20height%3D%2710%27%20rx%3D%272.1%27%20fill%3D%27%230d1014%27%2F%3E%3Cpath%20d%3D%27M8.6%2016.4h14.8v3.4a7.4%207.4%200%200%201-14.8%200z%27%20fill%3D%27%230d1014%27%2F%3E%3C%2Fsvg%3E">
 <style>
 :root{
   --bg:#0f1115; --panel:#161a21; --panel-2:#1b2029; --line:#262c37;
@@ -69,7 +70,11 @@ p.sub{color:var(--ink-2);margin:0 0 22px;font-size:1rem}
   border-radius:10px;color:var(--ink);font:inherit;padding:11px 12px;cursor:pointer;line-height:1.3}
 #places button:hover{border-color:var(--accent)}
 #places button[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft)}
-#places button .sm{display:block;font-size:.76rem;color:var(--ink-3);margin-top:2px}
+#places button .sm{display:block;font-size:.76rem;color:var(--ink-3);margin-top:2px;
+  font-variant-numeric:tabular-nums;letter-spacing:.01em}
+#places button{transition:border-color .13s ease,background .13s ease,transform .13s ease}
+@media(prefers-reduced-motion:reduce){#places button{transition:none}}
+#places button:hover{background:#1a2028;transform:translateY(-1px)}
 /* The picker holds two groups now, states and grid regions. #places is an auto-fill grid, so a
    heading has to be told to span it or it sits in the first column as a stray cell. */
 #places .grouphead{grid-column:1/-1;margin:12px 0 0;font-size:.74rem;font-weight:650;
@@ -97,6 +102,9 @@ p.sub{color:var(--ink-2);margin:0 0 22px;font-size:1rem}
 .readout{font-size:1.9rem;font-weight:650;letter-spacing:-.02em;margin:2px 0 4px}
 .readout .unit{font-size:1rem;font-weight:400;color:var(--ink-2);margin-left:4px}
 .caption{color:var(--ink-3);font-size:.86rem;margin:0}
+/* The page is fully keyboard-navigable and showed nothing at all when tabbed through. */
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);
+  outline-offset:2px;border-radius:6px}
 input[type=range]{width:100%;margin:14px 0 6px;accent-color:var(--accent)}
 .chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:6px}
 .chips button{background:transparent;border:1px solid var(--line);border-radius:999px;
@@ -123,9 +131,14 @@ button.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--li
 button.ghost:hover{border-color:var(--ink-3);color:var(--ink)}
 
 /* ---- the answer ------------------------------------------------------ */
+/* The digits carry the figure. The currency mark and the period step back in size and weight,
+   and tabular numerals stop the number shifting sideways as the digits change. */
 #answer .big{font-size:3.1rem;line-height:1.05;font-weight:700;letter-spacing:-.035em;
-  color:var(--accent);margin:4px 0 2px}
-#answer .per{font-size:1.05rem;color:var(--ink-2);font-weight:400}
+  color:var(--accent);margin:4px 0 2px;font-variant-numeric:tabular-nums;
+  display:flex;align-items:baseline;gap:.05em;flex-wrap:wrap}
+#answer .big .cur{font-size:1.75rem;font-weight:500;letter-spacing:0;opacity:.72}
+#answer .per{font-size:1rem;color:var(--ink-3);font-weight:450;letter-spacing:.01em;
+  margin-left:.12em}
 #answer .yr{color:var(--ink-3);font-size:.94rem;margin:0 0 4px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 @media(max-width:560px){.two{grid-template-columns:1fr}#answer .big{font-size:2.5rem}}
@@ -4965,6 +4978,9 @@ function paintChrome(){
    cannot present the same figure differently. */
 function money(v){ return '$' + Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function intf(v){ return Math.round(Number(v)).toLocaleString('en-US'); }
+/* The headline figure only. money() is unchanged and is still what every other figure and
+   every guard uses; this splits the currency mark off so it can be set apart from the digits. */
+function bigMoneyFigure(v){ return '<span class="cur">$</span>' + money(v).slice(1); }
 /* Revenue is billions and reads as nonsense in dollars-and-cents: the first version printed
    "$1,243.58 million a year" for a figure the expert tool states as $1.24 billion. */
 function bigMoney(v){
@@ -5132,16 +5148,16 @@ function paintAnswer(){
   if(oneFigure && sev !== null && isFinite(sev)){
     cards.push('<div><p class="who">Every household in ' + esc(r.name) +
       ' — ' + intf(r.households) + ' of them, whatever they spend on energy</p>' +
-      '<div class="big">' + money(sev) + '<span class="per"> / month</span></div>' +
+      '<div class="big">' + bigMoneyFigure(sev) + '<span class="per">/month</span></div>' +
       '<p class="yr">' + money(sev*12) + ' a year</p></div>');
   } else {
     if(sev !== null && isFinite(sev))
       cards.push('<div><p class="who">A household spending more than 10% of its income on energy</p>' +
-        '<div class="big">' + money(sev) + '<span class="per"> / month</span></div>' +
+        '<div class="big">' + bigMoneyFigure(sev) + '<span class="per">/month</span></div>' +
         '<p class="yr">' + money(sev*12) + ' a year</p></div>');
     if(isFinite(mod) && mod > 0)
       cards.push('<div><p class="who">A household spending 6–10%</p>' +
-        '<div class="big">' + money(mod) + '<span class="per"> / month</span></div>' +
+        '<div class="big">' + bigMoneyFigure(mod) + '<span class="per">/month</span></div>' +
         '<p class="yr">' + money(mod*12) + ' a year</p></div>');
     /* "Everyone, double for the worst off" pays a third group the same as the 6-10% tier, and
        showing only the two burdened cards let a reader conclude nobody else is paid -- which
@@ -5150,7 +5166,7 @@ function paintAnswer(){
     if(oth !== null && isFinite(oth) && oth > 0)
       cards.push('<div><p class="who">Every other household — ' + intf(x.otherEligible) +
         ' of them, spending under 6%</p>' +
-        '<div class="big">' + money(oth) + '<span class="per"> / month</span></div>' +
+        '<div class="big">' + bigMoneyFigure(oth) + '<span class="per">/month</span></div>' +
         '<p class="yr">' + money(oth*12) + ' a year</p></div>');
   }
   document.getElementById('answer').innerHTML = cards.join('') ||
