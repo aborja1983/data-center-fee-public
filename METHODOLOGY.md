@@ -1338,7 +1338,7 @@ osascript -l JavaScript render-check.js         # what the region tool SAYS, aga
 osascript -l JavaScript render-check.js by-state
 ```
 
-As of 2026-09-29 those run **358, 321, 41 and 40** checks, all passing. The last two exist because a
+As of 2026-10-01 those run **358, 321, 42 and 41** checks, all passing. The last two exist because a
 number can be right while the sentence around it is wrong, and for a long time only the first of those
 was tested.
 
