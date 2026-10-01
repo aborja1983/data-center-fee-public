@@ -2630,7 +2630,7 @@ function computeScenario(input){
   var tier   = TAX_TIERS[input.tierKey];
   if(!region || !tier) throw new Error('unknown region or tier');
   /* The three tiers are presets, not the only reachable rates. tierFossilCents overrides the fossil
-     rate; the clean rate stays exactly half of it, because the 2:1 ratio is the design (cit: ratio)
+     rate; the clean rate follows it at 1/R, where R is the fossil:clean dial (cit: rate-ratio)
      and is guarded separately. Everything downstream reads `tier`, so this is the only place the
      override has to land. Absent or non-positive, the preset applies unchanged. */
   /* The fossil:clean ratio is a dial, not the constant 2 (cit: rate-ratio). At 1 the two rates are
@@ -2703,7 +2703,7 @@ function computeScenario(input){
   //
   // The reference is the region's own grid mix as measured today, so the scheme is revenue-neutral
   // at enactment and responds to CHANGE from that baseline — rewarding improvement, penalising
-  // backsliding. At every moment a data center still faces the same 2:1 fossil:clean ratio, so its
+  // backsliding. At every moment a data center still faces the same fossil:clean ratio, so its
   // own procurement incentive is untouched.
   // CRITICAL: the index must key to the REGION'S GRID MIX, which the facility does not control —
   // NOT to the facility's own matched share. Keying it to the facility's share makes the whole
@@ -4492,7 +4492,7 @@ function computeScenario(input){
   var tier   = TAX_TIERS[input.tierKey];
   if(!region || !tier) throw new Error('unknown region or tier');
   /* The three tiers are presets, not the only reachable rates. tierFossilCents overrides the fossil
-     rate; the clean rate stays exactly half of it, because the 2:1 ratio is the design (cit: ratio)
+     rate; the clean rate follows it at 1/R, where R is the fossil:clean dial (cit: rate-ratio)
      and is guarded separately. Everything downstream reads `tier`, so this is the only place the
      override has to land. Absent or non-positive, the preset applies unchanged. */
   /* The fossil:clean ratio is a dial, not the constant 2 (cit: rate-ratio). At 1 the two rates are
@@ -4565,7 +4565,7 @@ function computeScenario(input){
   //
   // The reference is the region's own grid mix as measured today, so the scheme is revenue-neutral
   // at enactment and responds to CHANGE from that baseline — rewarding improvement, penalising
-  // backsliding. At every moment a data center still faces the same 2:1 fossil:clean ratio, so its
+  // backsliding. At every moment a data center still faces the same fossil:clean ratio, so its
   // own procurement incentive is untouched.
   // CRITICAL: the index must key to the REGION'S GRID MIX, which the facility does not control —
   // NOT to the facility's own matched share. Keying it to the facility's share makes the whole
@@ -5332,6 +5332,24 @@ function paintDecarb(){
   /* Nothing to say where the fee raises nothing: the five states with no tracked pipeline would
      otherwise get three rows of $0.00 and a paragraph about a trade-off they do not face. */
   if(now === null || !isFinite(now) || now <= 0){ box.hidden = true; return; }
+
+  /* AT 1:1 THE WHOLE ARGUMENT IS VOID, and printing it anyway was self-refuting: three identical
+     rows, every delta reading "about the same", under a paragraph saying the dividend falls and
+     households end up wanting a dirty grid. A flat fee does not shrink as the grid cleans, because
+     nothing about it keys to the grid. That is not a gap to hide -- it is the trade a flat fee
+     makes, and it belongs on screen as a finding rather than as three rows that look broken. */
+  if(Number(S.ratio) === 1){
+    box.hidden = false;
+    box.innerHTML =
+      '<p class="dhead">What happens as the grid cleans up</p>' +
+      '<p>At <strong>1:1</strong> every kilowatt-hour pays the same, whatever generated it, so a ' +
+      'cleaner grid does not change what the fee collects. This household would still get ' +
+      '<strong>' + money(now) + ' a month</strong> on a fully clean grid.</p>' +
+      '<p>That is the trade a flat fee makes: nothing erodes as the grid cleans, and a data center ' +
+      'gets no reason to buy clean power either. Raise the ratio above 1:1 to see the other side ' +
+      'of it.</p>';
+    return;
+  }
 
   var RULES = [
     { k: 0, lab: 'Left alone',

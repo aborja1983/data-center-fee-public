@@ -3168,7 +3168,7 @@ function computeScenario(input){
   var tier   = TAX_TIERS[input.tierKey];
   if(!region || !tier) throw new Error('unknown region or tier');
   /* The three tiers are presets, not the only reachable rates. tierFossilCents overrides the fossil
-     rate; the clean rate stays exactly half of it, because the 2:1 ratio is the design (cit: ratio)
+     rate; the clean rate follows it at 1/R, where R is the fossil:clean dial (cit: rate-ratio)
      and is guarded separately. Everything downstream reads `tier`, so this is the only place the
      override has to land. Absent or non-positive, the preset applies unchanged. */
   /* The fossil:clean ratio is a dial, not the constant 2 (cit: rate-ratio). At 1 the two rates are
@@ -3241,7 +3241,7 @@ function computeScenario(input){
   //
   // The reference is the region's own grid mix as measured today, so the scheme is revenue-neutral
   // at enactment and responds to CHANGE from that baseline — rewarding improvement, penalising
-  // backsliding. At every moment a data center still faces the same 2:1 fossil:clean ratio, so its
+  // backsliding. At every moment a data center still faces the same fossil:clean ratio, so its
   // own procurement incentive is untouched.
   // CRITICAL: the index must key to the REGION'S GRID MIX, which the facility does not control —
   // NOT to the facility's own matched share. Keying it to the facility's share makes the whole
@@ -3691,7 +3691,7 @@ var SOURCE_GROUPS = [
     ['rate-mod','Sets the two rates under the Moderate tier, the tool\'s default.'],
     ['rate-agg','Sets the two rates under the Aggressive tier.'],
     ['rate-ratio','Sets how much more a fossil kilowatt-hour pays than a clean one. At 1 the two are equal and the fee is flat.'],
-    ['ratio','Fixes two ratios the tool never varies: fossil is charged exactly twice the clean rate, and a severely burdened household receives exactly twice a moderately burdened one.'],
+    ['ratio','Fixes the ratio between the two household tiers, which the tool never varies: a severely burdened household receives exactly twice a moderately burdened one.'],
     ['rate-flat','Under the Flat structure, replaces the two rates with one. It is the selected tier\'s two rates blended at this territory\'s measured grid mix, so flat and differentiated raise identical revenue at enactment.'],
     ['rate-flat-options','The fixed alternatives to that blend, selectable instead of it. Choosing one makes the tier buttons inert, and the tool grays them out.'],
     ['grid-indexing','Multiplies the rate as the territory\'s fossil share falls, so revenue does not shrink simply because the grid cleaned. Held steady, revenue is constant whatever the grid burns; at the left end the index is off and a cleaner grid shrinks the dividend.'],
@@ -5483,6 +5483,28 @@ function renderAssumptions(){
    New Mexico's dividend from $705.54 to $910.20. That is the dial's real behavior and the tool
    makes no claim otherwise; diffToFlat/flatToDiff exist for the places that DO need the
    revenue-equivalent rate, and render-check tests them. */
+/* ---- the ratio in prose -------------------------------------------------------------
+   THE RATIO BECAME A DIAL AND FIVE SENTENCES DID NOT NOTICE. They were written when it was
+   fixed at 2 and said "twice the clean rate" whatever the dial read -- at 5:1 the page
+   asserted two different ratios at once, and the citation they pointed at said this was a
+   ratio "the tool never varies". These render the live value, and cite the dial. */
+function ratioNow(){ var R = Number(state.rateRatio); return (isFinite(R) && R >= 1) ? R : 2; }
+function ratioIsFlat(){ return ratioNow() === 1; }
+function ratioTimes(){
+  var R = ratioNow();
+  if(R === 2) return 'twice';
+  if(R === 3) return 'three times';
+  return (R % 1 ? R.toFixed(1) : String(R)) + ' times';
+}
+
+function ratioPair(){ var R = ratioNow(); return (R % 1 ? R.toFixed(1) : String(R)) + ':1'; }
+function ratioFraction(){            /* what a clean kWh pays, as a share of the fossil rate */
+  var R = ratioNow();
+  if(R === 1) return 'the same';
+  if(R === 2) return 'exactly half';
+  return 'about ' + Math.round(100/R) + '%';
+}
+
 function buildRateSeg(){
   var R = Number(state.rateRatio) || 2;
   var d = tierFossilNow();
@@ -5709,8 +5731,8 @@ function renderMethodology(res, r){
     ? '<p>One rate on every kilowatt-hour ' + cite('rate-flat') + '. It is the tier’s two rates blended at ' +
       'this territory’s measured grid mix, so flat and differentiated raise the same revenue at enactment.</p>' +
       '<div class="f">' + res.flatCents.toFixed(2) + '¢ on every kWh</div>'
-    : '<p>Fossil-counted and clean-counted kilowatt-hours pay different rates, fixed at two to one ' +
-      cite('ratio') + '.</p>' +
+    : '<p>Fossil-counted and clean-counted kilowatt-hours pay different rates, set at ' + ratioPair() + ' ' +
+      cite('rate-ratio') + '.</p>' +
       '<div class="f">fossil  ' + t.fossilCents + '¢/kWh      clean  ' + t.renewCents + '¢/kWh</div>') +
   (res.gridIndexing > 0
     ? '<p>The rate is then indexed to the grid mix, so revenue does not fall simply because the grid cleaned ' +
@@ -6182,7 +6204,9 @@ function render(){
        sentences, not a holistic story": it opened with a reconciliation table and never said what
        question the two controls were answering. */
     $('fossilIntro').innerHTML =
-      'The fee charges a fossil kilowatt-hour at twice the clean rate ' + cite('ratio') + '. ' +
+      (ratioIsFlat()
+        ? 'The fee charges every kilowatt-hour the same, whatever generated it ' + cite('rate-ratio') + '. '
+        : 'The fee charges a fossil kilowatt-hour at ' + ratioTimes() + ' the clean rate ' + cite('rate-ratio') + '. ') +
       'It starts at <strong>' + (g*100).toFixed(1) + '% fossil</strong> \u2014 ' + esc(r.name) +
       '\u2019s measured grid mix ' + cite('egrid-fossil') + ' \u2014 because a facility that procures ' +
       'nothing in particular looks like the grid around it. ' +
@@ -6287,13 +6311,24 @@ function render(){
       var clean = scenarioWith({ gridMixNow: 0, fossilShare: 0, gridIndexing: 0 });
       var drop  = (today.blendedTaxCents > 0)
                 ? (1 - clean.blendedTaxCents / today.blendedTaxCents) * 100 : 0;
-      $('perverseIntro').innerHTML =
-        'The fee charges fossil kilowatt-hours at twice the clean rate ' + cite('ratio') + ', so as ' +
-        esc(r.name) + '\u2019s grid decarbonizes fewer of them are charged at the higher rate. Change ' +
-        'nothing else and the fee on each kWh falls from <strong>' + today.blendedTaxCents.toFixed(2) +
-        '\u00a2</strong> today to <strong>' + clean.blendedTaxCents.toFixed(2) + '\u00a2</strong> at a ' +
-        'fully clean grid \u2014 <strong>' + drop.toFixed(0) + '% less</strong> \u2014 and the dividend ' +
-        'falls with it. <strong>That hands households a reason to want a dirty grid.</strong>';
+      /* AT 1:1 THIS ARGUMENT REFUTES ITSELF. A flat fee keys to nothing about the grid, so it does
+         not shrink as the grid cleans -- and the paragraph used to say "twice the clean rate" above a
+         figure falling from 1.47c to 1.47c, "0% less", before concluding the dividend falls and
+         households want a dirty grid. Three claims, the middle one true and the other two false. */
+      $('perverseIntro').innerHTML = ratioIsFlat()
+        ? 'At <strong>1:1</strong> every kilowatt-hour pays the same ' + cite('rate-ratio') + ', whatever ' +
+          'generated it, so nothing about ' + esc(r.name) + '\u2019s grid mix changes what the fee ' +
+          'collects: <strong>' + today.blendedTaxCents.toFixed(2) + '\u00a2</strong> today and ' +
+          '<strong>' + clean.blendedTaxCents.toFixed(2) + '\u00a2</strong> at a fully clean grid. ' +
+          '<strong>The problem below does not arise at a flat rate</strong> \u2014 and neither does the ' +
+          'reason for a facility to procure clean supply. Raise the ratio to see both.'
+        : 'The fee charges fossil kilowatt-hours at ' + ratioTimes() + ' the clean rate ' +
+          cite('rate-ratio') + ', so as ' +
+          esc(r.name) + '\u2019s grid decarbonizes fewer of them are charged at the higher rate. Change ' +
+          'nothing else and the fee on each kWh falls from <strong>' + today.blendedTaxCents.toFixed(2) +
+          '\u00a2</strong> today to <strong>' + clean.blendedTaxCents.toFixed(2) + '\u00a2</strong> at a ' +
+          'fully clean grid \u2014 <strong>' + drop.toFixed(0) + '% less</strong> \u2014 and the dividend ' +
+          'falls with it. <strong>That hands households a reason to want a dirty grid.</strong>';
     })();
 
     /* Why the three choices are identical right now, and how to see them differ. Shown only when
@@ -6330,8 +6365,8 @@ function render(){
     $('gridIndexingLede').innerHTML =
       'As the grid cleans, fewer kilowatt-hours count as fossil, so the fee raises less on its own. ' +
       '<strong>This sets whether households absorb that, or the rate rises to make it up.</strong> It ' +
-      'raises the fossil and clean rates together, so it never changes the two-to-one gap between them ' +
-      cite('ratio') + '.';
+      'raises the fossil and clean rates together, so it never changes the ' + ratioPair() + ' gap between them ' +
+      cite('rate-ratio') + '.';
 
     /* The three buttons, each carrying what it does to the fee. Built here rather than in a
        buildXSeg() function because the sub-labels are live figures for the current region. */
@@ -6453,7 +6488,7 @@ function render(){
 
   $('rateStructHint').innerHTML =
     '<em>Differentiated</em> charges electricity that ' +
-    'counts as fossil at twice the clean rate ' + cite('ratio') + '. ' +
+    'counts as fossil at ' + ratioTimes() + ' the clean rate ' + cite('rate-ratio') + '. ' +
     '<em>Flat</em> charges <strong>' + flatCents.toFixed(2) + '¢ on every kWh</strong> in ' +
     esc(r.name) + ' ' + cite('rate-flat') + flagIf('rate-flat') +
     ' — set to the differentiated design\u2019s blended rate at this state\u2019s measured grid mix, ' +
@@ -6669,7 +6704,7 @@ function render(){
             }).join('') + '</tr>';
         }).join('') +
         '</tbody></table></div>' +
-      '<div class="mrow"><span class="mlab">No choice here changes the two-to-one gap between the ' +
+      '<div class="mrow"><span class="mlab">No choice here changes the ' + ratioPair() + ' gap between the ' +
         'fossil and clean rates ' + cite('ratio') + ' \u2014 all three move both together' +
         '<span class="mlab-sub">what each column pays a household is in \u201cWhat each choice does to ' +
         'this payout\u201d below</span></span><span class="mv"></span></div>';
@@ -6706,30 +6741,47 @@ function render(){
     'a facility running on its own gas does not decarbonize when the grid does, so its fossil share has a ' +
     'floor the indexing cannot follow, so it stops being neutral wherever on-site gas is counted ' +
     cite('btm-mode') + '. And raising it does not change what a facility pays <em>relative to</em> a ' +
-    'dirtier competitor — the 2:1 fossil-to-clean ratio ' + cite('ratio') + ' is untouched. It moves the ' +
+    'dirtier competitor — the ' + ratioPair() + ' fossil-to-clean ratio ' + cite('rate-ratio') + ' is untouched. It moves the ' +
     'level for everyone in the state at once. ' +
     /* Asked for directly: "people will want to ask how the formula works to keep the dividend from
        shrinking -- can you use plain language." Every step below is exact, not a simplification:
-       because a fossil kWh pays exactly twice a clean one, the blended rate IS clean x (1 + fossil
-       share); the hold multiplier IS (1 + ref)/(1 + mix); and grow IS that squared. Verified to
-       nine decimals at four grid mixes. */
+       the blended rate IS clean x (1 + f(R-1)) for a ratio R, which is what the core computes as
+       rateRatio*f + 1 - f; the hold multiplier IS that factor at ref over the same at mix; and grow
+       IS it squared. Verified to nine decimals at four grid mixes. The prose below used to state
+       the R = 2 special case, clean x (1 + f), as though it were the formula -- true while the
+       ratio was fixed, and wrong on screen from the moment it became a dial. */
     '<span class="wsub">How holding it steady actually works</span>' +
     (function(){
+      var R = ratioNow();
       var cleanRate = scenarioWith({ gridMixNow:0, fossilShare:0, gridIndexing:0, btmMode:'off' }).blendedTaxCents;
       var refPc  = r.gridFossilShare;
       var demoPc = refPc/3;
-      var atRef  = cleanRate * (1 + refPc);
-      var atDemo = cleanRate * (1 + demoPc);
-      var mult   = (1 + refPc) / (1 + demoPc);
-      return 'A fossil kilowatt-hour pays exactly twice a clean one ' + cite('ratio') + ', so the ' +
-        'average fee across all of them comes to <strong>the clean rate \u00d7 (1 + the fossil share)</strong>. ' +
-        'At ' + esc(r.name) + '\u2019s ' + (refPc*100).toFixed(1) + '% that is ' + (1+refPc).toFixed(2) +
+      /* The general factor, matching the core's rateRatio*f + 1 - f. At R = 2 it is 1 + f, which is
+         what this paragraph used to hardcode in six places. */
+      var kf = function(f){ return 1 + f*(R - 1); };
+      var atRef  = cleanRate * kf(refPc);
+      var atDemo = cleanRate * kf(demoPc);
+      var mult   = kf(refPc) / kf(demoPc);
+      /* At 1:1 the factor is 1 at every grid mix, so there is nothing to hold steady and the
+         worked example below would print the same number four times. */
+      if(R === 1){
+        return 'At <strong>1:1</strong> every kilowatt-hour pays the same ' + cite('rate-ratio') +
+          ', so the blended rate is just the rate: <strong>' + cleanRate.toFixed(2) + '\u00a2</strong> ' +
+          'at any grid mix. There is nothing for the indexing to hold steady, because nothing erodes. ' +
+          'Raise the ratio above 1:1 and the formula below starts to do work.';
+      }
+      var formula = (R === 2)
+        ? 'the clean rate \u00d7 (1 + the fossil share)'
+        : 'the clean rate \u00d7 (1 + the fossil share \u00d7 ' + (R - 1).toFixed(R % 1 ? 1 : 0) + ')';
+      return 'A fossil kilowatt-hour pays exactly ' + ratioTimes() + ' a clean one ' + cite('rate-ratio') +
+        ', so the average fee across all of them comes to <strong>' + formula + '</strong>. ' +
+        'At ' + esc(r.name) + '\u2019s ' + (refPc*100).toFixed(1) + '% that is ' + kf(refPc).toFixed(2) +
         ' clean rates, or <strong>' + atRef.toFixed(2) + '\u00a2</strong>. Let the grid reach ' +
-        (demoPc*100).toFixed(1) + '% and it would be only ' + (1+demoPc).toFixed(2) + ' clean rates, ' +
+        (demoPc*100).toFixed(1) + '% and it would be only ' + kf(demoPc).toFixed(2) + ' clean rates, ' +
         '<strong>' + atDemo.toFixed(2) + '\u00a2</strong> \u2014 ' +
         (100 - atDemo/atRef*100).toFixed(0) + '% less money. <strong>Holding the dividend steady just ' +
-        'means scaling back up by the ratio of those two numbers</strong>: ' + (1+refPc).toFixed(2) +
-        ' \u00f7 ' + (1+demoPc).toFixed(2) + ' = ' + mult.toFixed(2) + ', which returns the rate to ' +
+        'means scaling back up by the ratio of those two numbers</strong>: ' + kf(refPc).toFixed(2) +
+        ' \u00f7 ' + kf(demoPc).toFixed(2) + ' = ' + mult.toFixed(2) + ', which returns the rate to ' +
         (atDemo*mult).toFixed(2) + '\u00a2. Growing it applies the same step twice: ' + mult.toFixed(2) +
         ' \u00d7 ' + mult.toFixed(2) + ' = ' + (mult*mult).toFixed(2) + '. That is the whole formula. ' +
         '<strong>The one thing it cannot follow is gas burned on site</strong>, which does not clean up ' +
@@ -6751,7 +6803,7 @@ function render(){
     cite('btm-mode') + '. So the choice between ' +
     'flat and differentiated is <em>not</em> a choice about how much money is collected. It is a choice ' +
     'about <strong>who inside the state pays it</strong>: under a flat rate every facility pays the ' +
-    'same cents per kWh, while when held steady a facility counted as fossil still pays twice a clean one and ' +
+    'same cents per kWh, while when held steady a facility counted as fossil still pays ' + ratioTimes() + ' a clean one and ' +
     'they merely average out to the flat rate.';
 
   /* ---- the trajectory table -------------------------------------------------------------
@@ -6823,8 +6875,8 @@ function render(){
           'this direction, so the dividend falls — the mirror image of the reward. A policy that pays households ' +
           'more for a cleaner grid necessarily pays them less for a dirtier one.')
       ) +
-      ' <strong>What indexing does not do:</strong> it does not change the 2:1 ratio between fossil and clean ' +
-      'rates ' + cite('ratio') + ', so a facility still halves its rate by procuring hourly-matched clean ' +
+      ' <strong>What indexing does not do:</strong> it does not change the ' + ratioPair() + ' ratio between fossil and clean ' +
+      'rates ' + cite('rate-ratio') + ', so a facility still cuts its rate to ' + ratioFraction() + ' by procuring hourly-matched clean ' +
       'supply.</div>';
   var lfLBNL = 0.50, lfNow = state.dataCenterLoadFactor;
   var lfRatio = lfNow/lfLBNL;
@@ -6853,10 +6905,20 @@ function render(){
   /* The button used to print only the SEVERE figure under a heading that said "Everyone", so a
      reader saw $30.78 beside the word everyone and reasonably read it as what everyone gets.
      Print the whole split instead. Reworded 2026-09-13 after exactly that misreading. */
-  function eligSummary(a){
+  /* BOTH "EVERYONE" OPTIONS REACH 100%, so a count alone printed the same subtitle under each
+     of them and gave a reader no way to see why they would pick one. What separates them is
+     the SPLIT, not the reach. The table below states all three groups for all three rules;
+     this puts the difference on the control itself, where the choice is made. */
+  function eligSummary(a, k){
     var reach = a.recipientEligible, tot = r.households;
     if(!(tot > 0)) return '—';
-    return fmtInt(reach) + ' paid · ' + (reach/tot*100).toFixed(0) + '% of households';
+    var who = fmtInt(reach) + ' paid · ' + (reach/tot*100).toFixed(0) + '% of households';
+    if(k === 'all-equal' && isFinite(a.severeMonthly))
+      return who + ' · ' + fmtMoney(a.severeMonthly) + ' each';
+    if(k === 'all-tiered' && isFinite(a.severeMonthly) && isFinite(a.moderateMonthly))
+      return who + ' · ' + fmtMoney(a.severeMonthly) + ' severe, ' +
+             fmtMoney(a.moderateMonthly) + ' everyone else';
+    return who;
   }
   function altElig(k){
     return computeScenario({
@@ -6873,7 +6935,7 @@ function render(){
     var alt = altElig(o.k);
     return '<button type="button" data-elig="' + o.k + '" aria-pressed="' +
            (state.eligibility === o.k) + '">' + o.name +
-           '<span class="sm">' + eligSummary(alt) + '</span></button>';
+           '<span class="sm">' + eligSummary(alt, o.k) + '</span></button>';
   }).join('');
 
   /* The buttons alone could not show that "everyone, double for severe" demotes moderately
@@ -7053,8 +7115,8 @@ function render(){
        cited at all: they used to render one at a time, whichever tier was selected, and with no
        selection two of the three would have been orphaned. */
     '<strong>' + tierFossilNow().toFixed(2) + '¢ per kWh</strong> on electricity counted as fossil and ' +
-    '<strong>' + (tierFossilNow()/2).toFixed(2) + '¢ per kWh</strong> on electricity counted as clean ' +
-    '\u2014 exactly half ' + cite('ratio') + '. The default of ' + TAX_TIERS.moderate.fossilCents +
+    '<strong>' + (tierFossilNow()/ratioNow()).toFixed(2) + '¢ per kWh</strong> on electricity counted as clean ' +
+    '\u2014 ' + ratioFraction() + ' ' + cite('rate-ratio') + '. The default of ' + TAX_TIERS.moderate.fossilCents +
     '¢ and the range are anchored to three rates this project set against Virginia\u2019s enacted ' +
     '1.1¢ ' + cite('va-enacted') + flagIf('va-enacted') + ' \u2014 approximately 1.4\u00d7, ' +
     '2.7\u00d7 and 5.5\u00d7 it ' + cite('rate-low') + cite('rate-mod') + cite('rate-agg') + '.';
@@ -7807,7 +7869,7 @@ function drawChart(current){
   $('legend').innerHTML =
     /* One entry, naming the rate rather than a tier -- there are no tiers to choose between now. */
     '<span class="li"><span class="swatch" style="border-top-color:'+TIER_COLOR[state.tier]+'"></span>' +
-      tierFossilNow().toFixed(2)+'¢ fossil / '+(tierFossilNow()/2).toFixed(2)+'¢ clean</span>' +
+      tierFossilNow().toFixed(2)+'¢ fossil / '+(tierFossilNow()/ratioNow()).toFixed(2)+'¢ clean</span>' +
     /* Built from REFERENCE_LINES rather than written out, for the same reason the array now
        computes its own label: a legend entry naming a figure it does not read is a figure that
        can go stale on its own. Only the lines actually drawn are listed. */

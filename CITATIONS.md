@@ -43,7 +43,7 @@ _The rate charged per kilowatt-hour, and how it changes over time._
 - **`rate-mod`** — Sets the two rates under the Moderate tier, the tool's default.
 - **`rate-agg`** — Sets the two rates under the Aggressive tier.
 - **`rate-ratio`** — Sets how much more a fossil kilowatt-hour pays than a clean one. At 1 the two are equal and the fee is flat.
-- **`ratio`** — Fixes two ratios the tool never varies: fossil is charged exactly twice the clean rate, and a severely burdened household receives exactly twice a moderately burdened one.
+- **`ratio`** — Fixes the ratio between the two household tiers, which the tool never varies: a severely burdened household receives exactly twice a moderately burdened one.
 - **`rate-flat`** — Under the Flat structure, replaces the two rates with one. It is the selected tier's two rates blended at this territory's measured grid mix, so flat and differentiated raise identical revenue at enactment.
 - **`rate-flat-options`** — The fixed alternatives to that blend, selectable instead of it. Choosing one makes the tier buttons inert, and the tool grays them out.
 - **`grid-indexing`** — Multiplies the rate as the territory's fossil share falls, so revenue does not shrink simply because the grid cleaned. Held steady, revenue is constant whatever the grid burns; at the left end the index is off and a cleaner grid shrinks the dividend.
