@@ -292,6 +292,10 @@ body.lean .hint.open::after, body.lean .mnote.open::after{ content:"hide \25B4";
 .measured .mrow+.mrow{margin-top:5px}
 .measured .mv{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
 .measured .mlab{color:var(--ink-2)}
+/* A worked line of arithmetic inside a note. Tabular figures so digits line up under each other,
+   and a slight indent so it reads as a calculation rather than more prose. */
+.calcline{display:block;margin:6px 0 6px 2px;font-variant-numeric:tabular-nums;
+  font-size:.82rem;line-height:1.5;color:var(--ink-2)}
 .measured .mlab-sub{display:block;font-size:.74rem;color:var(--ink-3);font-weight:400;margin-top:1px}
 .measured .mnote{font-size:.78rem;color:var(--ink-3);margin-top:8px;line-height:1.45}
 .warnrow{border:1px solid var(--warn-line);background:var(--warn-bg);color:var(--warn);
@@ -6650,23 +6654,60 @@ function render(){
 
   function mval(sc){ var m = headlineMonthly(sc); return (m === null) ? 'N/A' : fmtMoney(m) + '/mo'; }
   $('structCompare').innerHTML =
-    '<span class="mtag">One rate (1:1) vs ' + fmtRatio(rDiff) + ':1</span>' +
-    /* The disclosure hangs on the N:1 row ALWAYS, never on the selected row. At 1:1 every kWh pays
-       the same rate whatever it is classified as, so that row cannot see the facility slider at
-       all; only the differentiated row can diverge because of it. Putting it on the selected row
-       instead -- which this did briefly on 2026-10-04 -- attaches the explanation to the one
-       number it does not explain. */
-    '<div class="mrow"><span class="mlab">Dividend today at <strong>1:1</strong>, one rate on every kWh' +
-      (isFlat ? ' (selected)' : '') + '</span><span class="mv">' +
-      (isFlat ? '<strong>' + mval(atFlat) + '</strong>' : mval(atFlat)) + '</span></div>' +
-    '<div class="mrow"><span class="mlab">Dividend today at <strong>' + fmtRatio(rDiff) + ':1</strong>' +
-      (isFlat ? '' : ' (selected)') + facilityDisclosure + '</span><span class="mv">' +
-      (isFlat ? mval(atDiff) : '<strong>' + mval(atDiff) + '</strong>') + '</span></div>' +
+    '<span class="mtag">Same money, two shapes</span>' +
+    /* REWRITTEN 2026-10-05. The rows were "Dividend today at 1:1" and "Dividend today at N:1",
+       which reads as two things being true at once -- and the dividend is IDENTICAL on both, so it
+       looked like a contradiction rather than the point. It tripped the project owner on first
+       reading. Lead with what a data center PAYS, which is the only thing the dial changes, then
+       show the arithmetic that makes the two raise the same money, then the dividend ONCE. */
+    (function(){
+      var fRate = dFee, cRate = dFee / rDiff;
+      /* The worked example is computed from the DISPLAYED, rounded quantities, so a reader with a
+         calculator reproduces it exactly rather than landing a hundredth of a cent away. */
+      var fkD = Number((effFossilNow()*100).toFixed(1));
+      var ckD = Number((100 - fkD).toFixed(1));
+      var fRD = Number(fRate.toFixed(2)), cRD = Number(cRate.toFixed(2));
+      var tot = fkD*fRD + ckD*cRD;
+      return '<div class="mrow"><span class="mlab">A <strong>fossil</strong> kWh pays, at ' +
+          fmtRatio(rDiff) + ':1' + (isFlat ? '' : ' (selected)') + facilityDisclosure +
+          '</span><span class="mv">' + fRate.toFixed(2) + '¢</span></div>' +
+        '<div class="mrow"><span class="mlab">A <strong>clean</strong> kWh pays, at ' +
+          fmtRatio(rDiff) + ':1</span><span class="mv">' + cRate.toFixed(2) + '¢</span></div>' +
+        '<div class="mrow"><span class="mlab"><strong>Every</strong> kWh, with the dial at <strong>1:1</strong>' +
+          (isFlat ? ' (selected)' : '') + '</span><span class="mv">' + flatCents.toFixed(2) +
+          '¢</span></div>' +
+        '<div class="mnote"><span class="wsub">Why those raise the same money</span>' +
+          'Out of every 100 kWh ' + esc(r.name) + '’s data centers draw, <strong>' + fkD.toFixed(1) +
+          '</strong> count as fossil and <strong>' + ckD.toFixed(1) + '</strong> as clean ' +
+          cite('egrid-fossil') + '. So 100 kWh collects:' +
+          '<div class="calcline">at ' + fmtRatio(rDiff) + ':1 &nbsp; ' + fkD.toFixed(1) + ' × ' +
+            fRD.toFixed(2) + '¢ &nbsp;+&nbsp; ' + ckD.toFixed(1) + ' × ' + cRD.toFixed(2) +
+            '¢ &nbsp;=&nbsp; <strong>' + tot.toFixed(2) + '¢</strong></div>' +
+          '<div class="calcline">at 1:1 &nbsp; the same ' + tot.toFixed(2) +
+            '¢ spread evenly &nbsp;=&nbsp; <strong>' + (tot/100).toFixed(2) +
+            '¢</strong> on every kWh</div>' +
+          'The 1:1 figure is not a third rate — it is what ' + fmtRatio(rDiff) + ':1 already ' +
+          'averages to. Moving the dial moves the fee with it, so the money raised does not change. ' +
+          'What changes is whether a data center can lower its bill by buying clean power: at ' +
+          fmtRatio(rDiff) + ':1 it can, at 1:1 every kilowatt-hour costs the same wherever it came from.' +
+        '</div>';
+    })() +
+    /* ONE dividend row, because the two settings pay the same by construction -- that identity is
+       what the panel is for. If they ever differ, the guard below splits them back out rather than
+       printing one number for two different answers. */
+    (function(){
+      var a = headlineMonthly(atFlat), b = headlineMonthly(atDiff);
+      if(a !== null && b !== null && Math.abs(a - b) < 0.005)
+        return '<div class="mrow"><span class="mlab">Dividend, <strong>at either setting</strong>' +
+               '</span><span class="mv"><strong>' + mval(atDiff) + '</strong></span></div>';
+      return '<div class="mrow"><span class="mlab">Dividend at 1:1</span><span class="mv">' +
+             mval(atFlat) + '</span></div>' +
+             '<div class="mrow"><span class="mlab">Dividend at ' + fmtRatio(rDiff) +
+             ':1</span><span class="mv">' + mval(atDiff) + '</span></div>';
+    })() +
     '<div class="mrow"><span class="mlab">If ' + esc(r.name) + '’s grid reached <strong>0% fossil</strong>, ' +
       'at 1:1</span><span class="mv">' + mval(flatAtClean) + '</span></div>' +
-    '<div class="mrow"><span class="mlab">…the same at ' + fmtRatio(rDiff) + /* "at your current " + every branch read as "at your current the unindexed setting" /
-         "at your current this choice, as you have set it". All three were ungrammatical, not just
-         the last; the branches already carry their own article, so the prefix goes. */
+    '<div class="mrow"><span class="mlab">…the same at ' + fmtRatio(rDiff) +
       ':1, at ' +
       '<a class="jump" href="#gridIndexingAnchor" title="Jump to this control in Section 4">' +
       (kNow === 0 ? 'the unindexed setting'
