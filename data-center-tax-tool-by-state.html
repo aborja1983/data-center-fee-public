@@ -296,6 +296,9 @@ body.lean .hint.open::after, body.lean .mnote.open::after{ content:"hide \25B4";
    and a slight indent so it reads as a calculation rather than more prose. */
 .calcline{display:block;margin:6px 0 6px 2px;font-variant-numeric:tabular-nums;
   font-size:.82rem;line-height:1.5;color:var(--ink-2)}
+/* The national panel prints an annual figure with its monthly equivalent beneath. The sub-line
+   inherits the value column's bold and nowrap otherwise, and reads as a second headline. */
+.mv .mlab-sub{text-align:right;font-weight:400;white-space:nowrap;margin-top:0}
 .measured .mlab-sub{display:block;font-size:.74rem;color:var(--ink-3);font-weight:400;margin-top:1px}
 .measured .mnote{font-size:.78rem;color:var(--ink-3);margin-top:8px;line-height:1.45}
 .warnrow{border:1px solid var(--warn-line);background:var(--warn-bg);color:var(--warn);
@@ -5583,7 +5586,12 @@ function renderNational(d, res){
       return '<div class="mrow"><span class="mlab">' + t[0] +
              '<span class="mlab-sub">' + (t[2] === 1 ? 'one share' :
                 (t[2] > 1 ? t[2] + ' shares' : t[2] + ' of a share')) + '</span></span>' +
-             '<span class="mv">' + fmtMoney(t[1]) + '/mo</span></div>';
+             /* Monthly AND annual. The panel was monthly only, and the figures that get quoted
+                from it are annual, which left a reader doing x12 in their head off a number ending
+                in 97 cents. Annual is the louder of the two here because it is the one that
+                travels. */
+             '<span class="mv"><strong>' + fmtMoney(t[1] * MONTHS_PER_YEAR) + '/yr</strong>' +
+             '<span class="mlab-sub">' + fmtMoney(t[1]) + ' / mo</span></span></div>';
     }).join('') + '</div>' +
     (N.zeroStates.length
       ? 'The ones raising nothing \u2014 ' + esc(N.zeroStates.join(', ')) + ' \u2014 are paid anyway ' +
