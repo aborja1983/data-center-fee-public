@@ -2664,7 +2664,10 @@ function computeScenario(input){
      and not a better reading of any source -- the same revenue simply divides further.
      cit: eligibility */
   var eligibility = (input.eligibility === undefined) ? 'burdened' : String(input.eligibility);
-  if(eligibility !== 'all-tiered' && eligibility !== 'all-equal') eligibility = 'burdened';
+  /* Anything unrecognised falls back to 'burdened' rather than throwing. Listed rather than
+     chained, because this guard and the weights block below have to agree: a rule added to one
+     and not the other is silently coerced away here and the new branch never runs. */
+  if(['all-tiered','all-equal','all-halved'].indexOf(eligibility) < 0) eligibility = 'burdened';
   var btmShare = btmShareFor(region, btmMode);
   fossilShare = btmShare + (1 - btmShare) * fossilShare;
   fossilShare = Math.min(1, Math.max(0, fossilShare));
@@ -2828,6 +2831,12 @@ function computeScenario(input){
     sevWeight = 1; modWeight = 1; otherWeight = 1;
   } else if(eligibility === 'all-tiered'){
     sevWeight = SEVERE_TO_MODERATE_RATIO; modWeight = 1; otherWeight = 1;
+  } else if(eligibility === 'all-halved'){
+    /* A fourth rule, added 2026-10-04 at the project owner's request: universal, but the
+       unburdened half-share keeps most of the weight on the households the policy is for.
+       It sits between 'burdened' and 'all-tiered' -- everyone is paid, and a severely
+       burdened household still receives four times what an unburdened one does. */
+    sevWeight = SEVERE_TO_MODERATE_RATIO; modWeight = 1; otherWeight = 0.5;
   } else {
     sevWeight = SEVERE_TO_MODERATE_RATIO; modWeight = 1; otherWeight = 0;
   }
@@ -3002,6 +3011,22 @@ function headlineDistribution(input){
              input.tierFossilCents, input.takeUpRate, input.nationalShare, input.eligibility,
              input.elasticity, input.cpiIndexed, input.cpiRate, input.taxYears].join('|');
   if(_distKey === key) return _distCache;
+  /* WHICH SCENARIO THE OTHER 50 STATES RUN. This was hardcoded to scenarios[1], so a reader who
+     clicked "already under construction" got their own state on construction-only and every other
+     state still on construction-plus-planned -- a national total 3.2x too high, and a cross-state
+     rank comparing one scenario against another. The index is now read off the selected state's own
+     buildout, which is where the reader set it. */
+  var selR = REGIONS[input.regionKey], selIdx = 1, custom = true;
+  if(selR && selR.scenarios){
+    /* SEVERAL SCENARIOS CAN SHARE A VALUE, so a buildout figure does not always identify the chip:
+       DC and Massachusetts are 0 MW at both construction and construction-plus-planned. Taking the
+       first match put them on scenario 0 while the reader was on 1. On a tie, prefer the middle
+       scenario, which is what the tool opens on. */
+    var hits = [];
+    for(var si = 0; si < selR.scenarios.length; si++)
+      if(Math.abs(selR.scenarios[si].value - input.buildout) < 1e-9) hits.push(si);
+    if(hits.length){ custom = false; selIdx = (hits.indexOf(1) >= 0) ? 1 : hits[0]; }
+  }
   var out = [], here = null;
   REGION_ORDER.forEach(function(k){
     var x = REGIONS[k];
@@ -3010,7 +3035,7 @@ function headlineDistribution(input){
     for(var p in input) if(Object.prototype.hasOwnProperty.call(input, p)) o[p] = input[p];
     o.regionKey = k;
     if(k !== input.regionKey){
-      o.buildout      = x.scenarios[1].value;
+      o.buildout      = x.scenarios[Math.min(selIdx, x.scenarios.length - 1)].value;
       o.fossilShare   = x.gridFossilShare;
       o.gridMixNow    = x.gridFossilShare;
       o.severeShare   = x.severeShare;
@@ -3020,7 +3045,13 @@ function headlineDistribution(input){
     try { res = computeScenario(o); } catch(e){ return; }
     var m = res.severePayable ? res.severeMonthly : res.moderateMonthly;
     if(!isFinite(m)) return;
-    var row = { key:k, name:x.name, monthly:m };
+    var row = { key:k, name:x.name, monthly:m,
+                /* Carried so the national aggregate below can be built from the SAME sweep.
+                   A second pass over 51 jurisdictions would be a second chance to disagree. */
+                revenue:res.revenue, localRevenue:res.localRevenue,
+                severeHH:res.severeEligible, moderateHH:res.moderateEligible,
+                otherHH:res.otherEligible, allHH:x.households,
+                sevW:res.sevWeight, modW:res.modWeight, othW:res.otherWeight };
     out.push(row);
     if(k === input.regionKey) here = row;
   });
@@ -3039,9 +3070,43 @@ function headlineDistribution(input){
      AVERAGE, and median-to-mean across a distribution this skewed is not like for like. A handful
      of states carry very large pipelines, so the two differ by more than double. */
   var mean = out.reduce(function(a, r){ return a + r.monthly; }, 0) / n;
+  /* THE NATIONAL AGGREGATE. Only meaningful in this tool: its 51 jurisdictions tile the country
+     exactly once each. The region tool's 24 are RTOs plus large utilities that sit inside or beside
+     them, so the same sum there would double-count some households and miss others -- which is why
+     this lives here and is not mirrored into the region tool's core.
+     Built from the sweep above rather than from a second pass, so the national figure and the
+     distribution can never disagree about the same state. */
+  var nat = null;
+  if(n === REGION_ORDER.length){
+    var nRev = 0, nSev = 0, nMod = 0, nOth = 0, nAll = 0;
+    out.forEach(function(r){
+      /* localRevenue, not revenue: the per-state payouts divide revenue AFTER the national
+         carve-out slider takes its share, so summing gross overstated every payment by
+         1/(1-nationalShare) and the panel's own reconciliation stopped holding. */
+      nRev += r.localRevenue; nSev += r.severeHH; nMod += r.moderateHH;
+      nOth += r.otherHH;  nAll += r.allHH;
+    });
+    var w0 = out[0];
+    var nW = w0.sevW * nSev + w0.modW * nMod + w0.othW * nOth;
+    var share = (nW > 0) ? (nRev / nW / MONTHS_PER_YEAR) : 0;
+    nat = { revenue:nRev, severeHH:nSev, moderateHH:nMod, otherHH:nOth, allHH:nAll,
+            scenarioIdx:selIdx, scenarioCustom:custom,
+            scenarioLabel: (selR && selR.scenarios && selR.scenarios[selIdx]) ? selR.scenarios[selIdx].tag : '',
+            /* Who is actually PAID, by the same rule the per-state panel uses. Printing allHH under
+               a rule that pays only burdened households said 126 million people receive a cheque
+               when 25 million do. */
+            recipients: (w0.othW > 0) ? nAll : (nSev + nMod),
+            weighted:nW, oneShare:share,
+            severeMonthly: share * w0.sevW,
+            moderateMonthly: share * w0.modW,
+            otherMonthly: (w0.othW > 0) ? share * w0.othW : null,
+            sevW:w0.sevW, modW:w0.modW, othW:w0.othW,
+            zeroStates: out.filter(function(r){ return !(r.revenue > 0); }).map(function(r){ return r.name; }) };
+  }
   _distCache = { n:n, rank: here ? out.indexOf(here) + 1 : null, here:here,
                  median:med, mean:mean, medianNear:near, top:out[0], bottom:out[n-1],
                  zeros: out.filter(function(r){ return r.monthly < 0.005; }).length,
+                 national:nat,
                  all:out };
   return _distCache;
 }
@@ -4526,7 +4591,10 @@ function computeScenario(input){
      and not a better reading of any source -- the same revenue simply divides further.
      cit: eligibility */
   var eligibility = (input.eligibility === undefined) ? 'burdened' : String(input.eligibility);
-  if(eligibility !== 'all-tiered' && eligibility !== 'all-equal') eligibility = 'burdened';
+  /* Anything unrecognised falls back to 'burdened' rather than throwing. Listed rather than
+     chained, because this guard and the weights block below have to agree: a rule added to one
+     and not the other is silently coerced away here and the new branch never runs. */
+  if(['all-tiered','all-equal','all-halved'].indexOf(eligibility) < 0) eligibility = 'burdened';
   var btmShare = btmShareFor(region, btmMode);
   fossilShare = btmShare + (1 - btmShare) * fossilShare;
   fossilShare = Math.min(1, Math.max(0, fossilShare));
@@ -4690,6 +4758,12 @@ function computeScenario(input){
     sevWeight = 1; modWeight = 1; otherWeight = 1;
   } else if(eligibility === 'all-tiered'){
     sevWeight = SEVERE_TO_MODERATE_RATIO; modWeight = 1; otherWeight = 1;
+  } else if(eligibility === 'all-halved'){
+    /* A fourth rule, added 2026-10-04 at the project owner's request: universal, but the
+       unburdened half-share keeps most of the weight on the households the policy is for.
+       It sits between 'burdened' and 'all-tiered' -- everyone is paid, and a severely
+       burdened household still receives four times what an unburdened one does. */
+    sevWeight = SEVERE_TO_MODERATE_RATIO; modWeight = 1; otherWeight = 0.5;
   } else {
     sevWeight = SEVERE_TO_MODERATE_RATIO; modWeight = 1; otherWeight = 0;
   }

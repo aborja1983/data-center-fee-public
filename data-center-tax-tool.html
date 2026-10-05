@@ -581,8 +581,6 @@ footer{color:var(--ink-3);font-size:.8rem;margin-top:24px;line-height:1.5}
     </div>
   </div>
   <p class="hint" id="rateStructHint"></p>
-  <div id="flatRateWrap" hidden>
-    <p class="hint" id="flatRateHint"></p>
   </div>
 
   <h3 class="subh">Who receives the dividend</h3>
@@ -2303,7 +2301,10 @@ function computeScenario(input){
      and not a better reading of any source -- the same revenue simply divides further.
      cit: eligibility */
   var eligibility = (input.eligibility === undefined) ? 'burdened' : String(input.eligibility);
-  if(eligibility !== 'all-tiered' && eligibility !== 'all-equal') eligibility = 'burdened';
+  /* Anything unrecognised falls back to 'burdened' rather than throwing. Listed rather than
+     chained, because this guard and the weights block below have to agree: a rule added to one
+     and not the other is silently coerced away here and the new branch never runs. */
+  if(['all-tiered','all-equal','all-halved'].indexOf(eligibility) < 0) eligibility = 'burdened';
   var btmShare = btmShareFor(region, btmMode);
   fossilShare = btmShare + (1 - btmShare) * fossilShare;
   fossilShare = Math.min(1, Math.max(0, fossilShare));
@@ -2467,6 +2468,12 @@ function computeScenario(input){
     sevWeight = 1; modWeight = 1; otherWeight = 1;
   } else if(eligibility === 'all-tiered'){
     sevWeight = SEVERE_TO_MODERATE_RATIO; modWeight = 1; otherWeight = 1;
+  } else if(eligibility === 'all-halved'){
+    /* A fourth rule, added 2026-10-04 at the project owner's request: universal, but the
+       unburdened half-share keeps most of the weight on the households the policy is for.
+       It sits between 'burdened' and 'all-tiered' -- everyone is paid, and a severely
+       burdened household still receives four times what an unburdened one does. */
+    sevWeight = SEVERE_TO_MODERATE_RATIO; modWeight = 1; otherWeight = 0.5;
   } else {
     sevWeight = SEVERE_TO_MODERATE_RATIO; modWeight = 1; otherWeight = 0;
   }
@@ -2804,7 +2811,7 @@ var SOURCE_GROUPS = [
     ['dc-definition','What the word \u201cdata center\u201d covers in the buildout above \u2014 the tool inherits the definition rather than setting one, and it differs between territories. Enters no calculation; it says what the megawatts are counting.'],
     ['loadfactor','The second term. Megawatts are multiplied by this share to get average draw.'],
     ['lbnl-load-factor','A sourced alternative to the dial above, shown beside it so the reader can see what a published figure would give instead.'],
-    ['eligibility','Sets the divisor: who the revenue is shared among. All three settings raise identical revenue, so this changes who is paid and how much each receives, never how much is collected.'],
+    ['eligibility','Sets the divisor: who the revenue is shared among. Every setting raises identical revenue, so this changes who is paid and how much each receives, never how much is collected.'],
     ['lbnl-flexibility-gap','A recorded absence, from the same report. Load shifting is the likeliest way a facility could owe less without consuming less; LBNL states the research to quantify it has not been done, so the tool models no such effect.'],
     ['lbnl-elasticity-gap','A recorded absence, from the same report. LBNL states the link between the price of cloud and AI services and their power demand “is not well understood”, which is why the price-sensitivity dial defaults to no response.'],
     ['hours','The third term: hours in a year. Converts average megawatts into megawatt-hours.'],
@@ -3300,7 +3307,7 @@ var CITATIONS = [
     confidence:'Illustrative — design parameter, no source exists or could exist' },
   { id:'eligibility', value:'burdened only (default) · everyone tiered · everyone equal', what:'Who receives the dividend', region:'All',
     source:'This project’s design decision — no study sets it, and none could',
-    locator:'WHAT IT DOES: sets the divisor. \u201cBurdened only\u201d pays the severely and moderately burdened households DOE LEAD identifies, severe at twice the moderate rate. \u201cEveryone, tiered\u201d keeps that 2:1 weighting and adds every remaining household at the base rate. \u201cEveryone, equal\u201d drops the weighting and pays every household the same. WHAT IT DOES NOT DO: it raises no additional revenue \u2014 the fee collects the same money under all three, and widening eligibility divides it further. WHY IT IS A PARAMETER AND NOT A FINDING: no source establishes who ought to receive a dividend. The burden data (cit: thresholds) can say who spends the most of their income on energy; it cannot say whether a payment should be confined to them.',
+    locator:'WHAT IT DOES: sets the divisor. \u201cBurdened only\u201d pays the severely and moderately burdened households DOE LEAD identifies, severe at twice the moderate rate. \u201cEveryone, tiered\u201d keeps that 2:1 weighting and adds every remaining household at the base rate. \u201cEveryone, half for unburdened\u201d keeps the 2:1 weighting for the burdened tiers and adds every remaining household at half the moderate rate. \u201cEveryone, equal\u201d drops the weighting and pays every household the same. WHAT IT DOES NOT DO: it raises no additional revenue \u2014 the fee collects the same money under all three, and widening eligibility divides it further. WHY IT IS A PARAMETER AND NOT A FINDING: no source establishes who ought to receive a dividend. The burden data (cit: thresholds) can say who spends the most of their income on energy; it cannot say whether a payment should be confined to them.',
     confidence:'Illustrative — design parameter, no source exists or could exist' },
   { id:'ratio', value:'2 : 1', what:'Severe:moderate household payout ratio \u2014 what a severely burdened household receives against a moderately burdened one', region:'All',
     source:'This project’s design decision (stated in the build brief) — no study sets it, and none could',
@@ -4410,7 +4417,7 @@ function renderMethodology(res, r){
                                                                    maximumFractionDigits:d===undefined?0:d}); };
   var pc = function(x, d){ return (x*100).toFixed(d===undefined?1:d) + '%'; };
   var btm = btmShareFor(r, state.btmMode);
-  var isFlat = state.rateStructure === 'flat';
+  var isFlat = ratioIsFlat();
   var procured = state.fossilShare;
   var effFossil = btm + (1 - btm) * procured;
 
@@ -4939,7 +4946,7 @@ function render(){
   try { atClean = headlineMonthly(scenarioWith({ gridMixNow: 0, fossilShare: 0 })); } catch(e) { atClean = null; }
   var nowMonthly = headlineMonthly(res);
   $('gridIndexingOut').textContent = kLabel +
-    (state.rateStructure === 'flat' ? ' · not used under a flat rate'
+    (ratioIsFlat() ? ' · not used at 1:1'
       : (atClean !== null && nowMonthly !== null && nowMonthly > 0
           ? ' · ' + fmtMoney(atClean) + '/mo at a fully clean grid'
           : ''));
@@ -5134,7 +5141,7 @@ function render(){
        (multiplier exactly 1) or because a flat rate ignores the index entirely. */
     (function(){
       var el = $('gridIndexingInert');
-      var flat = (state.rateStructure === 'flat');
+      var flat = ratioIsFlat();   // 1:1 ignores the index entirely
       /* Same test as the buttons use, for the same reason: the box must appear exactly when a
          reader cannot see the three choices differ, not when the multiplier is exactly 1. */
       var same = [0,1,2].map(function(k){
@@ -5148,8 +5155,9 @@ function render(){
          with its own guard, so the duplication was enforced twice. One line here, at the point of
          confusion, with the button that resolves it; the hint no longer repeats the claim. */
       el.innerHTML = flat
-        ? '<strong>A flat rate is selected, so all three choices do nothing.</strong> ' +
-          'Switch back to Differentiated in Section 3 to use them.'
+        ? '<strong>The dial is at 1:1, so all three choices do nothing.</strong> ' +
+          'Every kWh pays the same rate, so none of them can get cleaner. ' +
+          '<a class="jump" href="#pickRatio">Raise the ratio in Section 3 \u2191</a> to use them.'
         /* The assertion that stood here -- "all three come to the same fee right now" -- read as a
            contradiction of the buttons directly above it, which name three DIFFERENT fees (0.95,
            1.47, 2.28 in New Mexico). Both were true: the buttons quote the fee at a fully clean
@@ -5257,53 +5265,55 @@ function render(){
   // Both must be pinned to today's mix, not just the grid: the grid slider moves the facility's
   // classification with it, so overriding gridMixNow alone would leave a decarbonized FACILITY
   // sitting on today's grid — which is not "today" and makes this row duplicate the k = 0 row.
-  /* ---- rate structure: flat vs differentiated ---------------------------
-     The flat rate is revenue-matched at the region's MEASURED grid mix, so switching structures
-     changes nothing at enactment. Everything it changes is downstream: the fee base, what must be
-     reported, and whether the grid mix can move the dividend at all. */
-  var isFlat = (state.rateStructure === 'flat');
-  var flatCents = r.gridFossilShare*TAX_TIERS[state.tier].fossilCents
-                + (1 - r.gridFossilShare)*TAX_TIERS[state.tier].renewCents;
-  var otherStruct = scenarioWith({ rateStructure: isFlat ? 'differentiated' : 'flat' });
-  var flatAtClean  = scenarioWith({ rateStructure:'flat',           gridMixNow:0, fossilShare:0 });
+  /* ---- rate shape: how much more a fossil kWh pays ----------------------
+     Flat is this dial collapsed to 1:1, not a second structure. The fee slider follows the dial so
+     the money raised is held (see the ratioSlider handler), which is why the two "today" rows below
+     are identical and separate only as the grid changes.
+
+     REWIRED 2026-10-04. This read state.rateStructure, which nothing has been able to set since the
+     structure buttons were removed on 2026-09-24. isFlat was therefore permanently false: the panel
+     always rendered "differentiated (selected)" beside a choice the reader could not make, and the
+     dead branch in gridIndexingInert told them to "switch back to Differentiated in Section 3" --
+     a control that no longer exists. The calc core keeps rateStructure because both verifiers
+     exercise the flat-rate math; what is gone is the pretence that a reader selects it. */
+  var isFlat = ratioIsFlat();
+  var rNow   = ratioNow();
+  var rDiff  = (rNow > 1) ? rNow : 2;            // what to compare 1:1 against
+  function fmtRatio(R){ return (R % 1) ? R.toFixed(1) : R.toFixed(0); }
+  /* The fee that holds revenue at ratio R -- the same conversion the dial's own handler applies,
+     so at R = rNow this returns the current fee exactly and the panel cannot contradict the
+     headline above it. blendFactor(1) === 1, so feeAtRatio(1) IS the one-rate-on-every-kWh fee. */
+  function feeAtRatio(R){ return tierFossilNow() * blendFactor(rNow) / blendFactor(R); }
+  var flatCents = feeAtRatio(1);
+  var dFee = feeAtRatio(rDiff);
+  var differential = dFee - dFee / rDiff;
+  var atFlat = scenarioWith({ rateRatio:1,     tierFossilCents:flatCents });
+  var atDiff = scenarioWith({ rateRatio:rDiff, tierFossilCents:dFee });
+  // Both pinned to a fully clean grid AND a fully clean facility: moving gridMixNow alone would
+  // leave a decarbonized facility sitting on today's grid, which is not "0% fossil".
+  var flatAtClean = scenarioWith({ rateRatio:1,     tierFossilCents:flatCents, gridMixNow:0, fossilShare:0 });
   // Deliberately NOT overriding gridIndexing: this must track whatever the k-dial is actually set
-  // to (default k=2), or this row shows an answer that contradicts the dial sitting right above it
-  // — the same class of bug as the two "two numbers, one fee" fixes earlier in this session.
-  var diffAtClean  = scenarioWith({ rateStructure:'differentiated', gridMixNow:0, fossilShare:0 });
+  // to, or this row shows an answer that contradicts the dial sitting right above it.
+  var diffAtClean = scenarioWith({ rateRatio:rDiff, tierFossilCents:dFee, gridMixNow:0, fossilShare:0 });
   var kNow = state.gridIndexing;
   var priceCents = (r.industrialCents !== undefined) ? r.industrialCents : null;
-  var differential = TAX_TIERS[state.tier].fossilCents - TAX_TIERS[state.tier].renewCents;
-
-  /* What the instrument legally IS, and the objection this tool cannot answer. Both stood in the
-     plain-language glossary until it was removed on 2026-09-24; the first is a framing the tool
-     owes a reader, the second is an unsourced claim the glossary had been making since an early
-     draft and is now recorded as the gap it is. */
-  /* instrumentNote removed 2026-09-24 at the project owner's request, the same day it was added.
-     It carried two things: that the instrument is legally an excise, and that state uniformity
-     clauses might restrict it. Neither is on screen now. The excise characterization survives in
-     files/METHODOLOGY.md and files/REGIONS.md, which say "tax" throughout and document the
-     instrument as an excise; the uniformity gap survives in METHODOLOGY's unsourced table. */
 
   $('rateStructHint').innerHTML =
-    '<em>Differentiated</em> charges electricity that ' +
-    'counts as fossil at ' + ratioTimes() + ' the clean rate ' + cite('rate-ratio') + '. ' +
-    '<em>Flat</em> charges <strong>' + flatCents.toFixed(2) + '¢ on every kWh</strong> in ' +
-    esc(r.name) + ' ' + cite('rate-flat') + flagIf('rate-flat') +
-    ' — set to the differentiated design\u2019s blended rate at this region\u2019s measured grid mix, ' +
-    'so <strong>both raise identical revenue at enactment</strong>. Its base is metered consumption, ' +
-    'which utilities already measure and audit. ' +
+    'The dial sets how much more a kilowatt-hour that counts as fossil pays than a clean one ' +
+    cite('rate-ratio') + '. At <strong>1:1</strong> no distinction is left and the fee becomes one ' +
+    'rate on every kWh — <strong>' + flatCents.toFixed(2) + '¢ in ' + esc(r.name) + '</strong> ' +
+    cite('rate-flat') + flagIf('rate-flat') + '. Moving the dial moves the fee with it, so ' +
+    '<strong>every setting raises the same revenue</strong>; the dial changes the shape of the ' +
+    'charge, not its size. ' +
     (isFlat
-      ? '<strong>Flat is selected: the grid-mix and indexing controls below have no effect on revenue</strong> — ' +
-        'not because they are switched off, but because kWh do not get cleaner. The perverse incentive ' +
-        'cannot arise under this structure.'
-      : '<strong>Differentiated is selected</strong>, so the grid-mix and indexing controls below are live.');
+      ? '<strong>You are at 1:1, so the grid-mix and indexing controls below cannot move the ' +
+        'dividend</strong> — not because they are switched off, but because no kWh counts as ' +
+        'cleaner than another. The perverse incentive cannot arise at this setting.'
+      : '<strong>Fossil kWh pay ' + ratioTimes() + ' the clean rate</strong>, so the grid-mix and ' +
+        'indexing controls below are live.');
 
-  /* "Differentiated" rows use whatever the facility-procurement slider (state.fossilShare) is set
-     to RIGHT NOW; "flat/matched" rows are frozen to the region's own measured reference and cannot
-     see that slider at all (matchedCents reads region.gridFossilShare, never gridMixNow/fossilShare —
-     see the calc core). Two rows both labeled "today" can therefore show very different numbers
-     with nothing wrong — but only if the reader knows one is live and one is frozen. Disclose the
-     actual facility setting on whichever row is differentiated, so it stops looking like a bug. */
+  /* Rows at the CURRENT facility setting disclose it, because the grid slider moves a facility's
+     classification and two rows both labeled "today" can otherwise differ with nothing wrong. */
   var facilityAtRef = Math.abs(state.fossilShare - r.gridFossilShare) < 0.005;
   var facilityDisclosure = facilityAtRef ? '' :
     '<span class="mlab-sub">facility set to ' + (state.fossilShare*100).toFixed(1) + '% fossil — ' +
@@ -5312,107 +5322,92 @@ function render(){
     'defaults to the grid average unless certified otherwise ' +
     '<a class="jump" href="#fossilShareAnchor">how ↑</a></span>';
 
+  function mval(sc){ var m = headlineMonthly(sc); return (m === null) ? 'N/A' : fmtMoney(m) + '/mo'; }
   $('structCompare').innerHTML =
-    '<span class="mtag">Flat vs differentiated</span>' +
-    '<div class="mrow"><span class="mlab">Dividend today, <strong>' + (isFlat?'flat':'differentiated') +
-      '</strong> (selected)' + (isFlat ? '' : facilityDisclosure) + '</span><span class="mv"><strong>' +
-      (headlineMonthly(res) === null ? 'N/A' : fmtMoney(headlineMonthly(res)) + '/mo') + '</strong></span></div>' +
-    '<div class="mrow"><span class="mlab">Dividend today, ' + (isFlat?'differentiated':'flat') +
-      (isFlat ? facilityDisclosure : '') + '</span>' +
-      '<span class="mv">' + (headlineMonthly(otherStruct) === null ? 'N/A'
-        : fmtMoney(headlineMonthly(otherStruct)) + '/mo') + '</span></div>' +
-    '<div class="mrow"><span class="mlab">If ' + esc(r.name) + '\u2019s grid reached <strong>0% fossil</strong>, flat</span>' +
-      '<span class="mv">' + (headlineMonthly(flatAtClean) === null ? 'N/A'
-        : fmtMoney(headlineMonthly(flatAtClean)) + '/mo') + '</span></div>' +
-    '<div class="mrow"><span class="mlab">…the same, differentiated at your current ' +
+    '<span class="mtag">One rate (1:1) vs ' + fmtRatio(rDiff) + ':1</span>' +
+    /* The disclosure hangs on the N:1 row ALWAYS, never on the selected row. At 1:1 every kWh pays
+       the same rate whatever it is classified as, so that row cannot see the facility slider at
+       all; only the differentiated row can diverge because of it. Putting it on the selected row
+       instead -- which this did briefly on 2026-10-04 -- attaches the explanation to the one
+       number it does not explain. */
+    '<div class="mrow"><span class="mlab">Dividend today at <strong>1:1</strong>, one rate on every kWh' +
+      (isFlat ? ' (selected)' : '') + '</span><span class="mv">' +
+      (isFlat ? '<strong>' + mval(atFlat) + '</strong>' : mval(atFlat)) + '</span></div>' +
+    '<div class="mrow"><span class="mlab">Dividend today at <strong>' + fmtRatio(rDiff) + ':1</strong>' +
+      (isFlat ? '' : ' (selected)') + facilityDisclosure + '</span><span class="mv">' +
+      (isFlat ? mval(atDiff) : '<strong>' + mval(atDiff) + '</strong>') + '</span></div>' +
+    '<div class="mrow"><span class="mlab">If ' + esc(r.name) + '’s grid reached <strong>0% fossil</strong>, ' +
+      'at 1:1</span><span class="mv">' + mval(flatAtClean) + '</span></div>' +
+    '<div class="mrow"><span class="mlab">…the same at ' + fmtRatio(rDiff) + /* "at your current " + every branch read as "at your current the unindexed setting" /
+         "at your current this choice, as you have set it". All three were ungrammatical, not just
+         the last; the branches already carry their own article, so the prefix goes. */
+      ':1, at ' +
       '<a class="jump" href="#gridIndexingAnchor" title="Jump to this control in Section 4">' +
       (kNow === 0 ? 'the unindexed setting'
         : kNow === 1 ? 'the held-steady setting (' + kNeutralLabel() + ')'
-        : 'this choice, as you have set it') + ' ↑</a></span>' +
-      '<span class="mv">' + (headlineMonthly(diffAtClean) === null ? 'N/A'
-        : fmtMoney(headlineMonthly(diffAtClean)) + '/mo') + '</span></div>' +
+        : 'the setting you have chosen') + ' ↑</a></span>' +
+      '<span class="mv">' + mval(diffAtClean) + '</span></div>' +
     '<div class="mnote"><span class="wsub">How the two diverge</span>' +
-      'They are identical today and separate only as the grid ' +
-      'changes. Under flat the dividend is unmoved by a decarbonizing grid because the fee base ' +
-      'is kWh. Under differentiated, what happens depends entirely on this choice: ' +
+      'They are identical today — the dial holds revenue — and separate only as the grid changes. ' +
+      'At 1:1 the dividend is unmoved by a decarbonizing grid, because the fee base is kWh and a kWh ' +
+      'does not get cleaner. Above 1:1, what happens depends entirely on this choice: ' +
       (kNow === 0
         ? 'on <strong>Dividend shrinks it falls</strong> — the perverse case these buttons exist to fix. ' +
-          'Try the setting above at held-steady, which exactly matches flat always, or beyond it, which rewards decarbonization.'
+          'Try the held-steady setting, which matches 1:1 exactly whatever the grid does, or beyond it, ' +
+          'which rewards decarbonization.'
         : kNow === 1
-        ? 'at your current <strong>held-steady setting it holds exactly steady</strong> — by construction, that setting and this ' +
-          'matched flat rate always raise identical revenue, whatever the grid does.'
+        ? 'at your current <strong>held-steady setting it holds exactly steady</strong> — by ' +
+          'construction, that setting and 1:1 always raise identical revenue, whatever the grid does.'
         : kNow < 1
-        ? 'at your current setting <strong>it still falls</strong>, just less sharply ' +
-          'than fully unindexed — holding it steady takes a stronger setting.'
-        : 'at your current setting <strong>it actually RISES</strong> — by more than ' +
-          'flat. A setting above held-steady raises the dividend as the grid decarbonizes rather than ' +
-          'only holding it level.') +
-      '<span class="wsub">What each structure gives up</span>' +
-      'Flat removes the grid-mix question structurally, with no dial to set at all; differentiated keeps ' +
-      'the question open and lets these three buttons answer it however you choose. ' +
-      'What flat gives up: the ' + differential.toFixed(2) + '¢/kWh gap between ' +
-      'the fossil and clean rates is the facility\u2019s reason to procure clean supply' +
+        ? 'at your current setting <strong>it still falls</strong>, just less sharply than fully ' +
+          'unindexed — holding it steady takes a stronger setting.'
+        : 'at your current setting <strong>it actually RISES</strong> — by more than 1:1 would. A ' +
+          'setting above held-steady raises the dividend as the grid decarbonizes rather than only ' +
+          'holding it level.') +
+      '<span class="wsub">What collapsing the dial costs</span>' +
+      'Collapsing the dial removes the grid-mix question structurally, with no dial left to set; ' +
+      'above 1:1 the question stays open and these three buttons answer it however you choose. ' +
+      'What 1:1 gives up: the ' + differential.toFixed(2) + '¢/kWh gap between the fossil and clean ' +
+      'rates is the facility’s reason to procure clean supply' +
       (priceCents !== null
         ? ' — worth <strong>' + Math.round(differential/priceCents*100) + '% of the ' +
           priceCents.toFixed(2) + '¢ industrial power price in ' + esc(r.name) + '</strong> ' + cite('industrial-price')
         : '') +
       '. Whether to give that up depends on whether you think this fee should carry procurement policy ' +
       'at all, or whether a clean supply standard should. ' +
+      /* RE-HOMED 2026-10-04. These two lived in #flatRateHint, inside #flatRateWrap, which is
+         hidden in markup and un-hidden only by `!isFlat` -- and isFlat read state.rateStructure,
+         which nothing has been able to set since 2026-09-24. Two verify guards were passing on
+         text no reader could reach. They are visible here for the first time since. */
+      (function(){
+        if(!res.avgMonthlyBill || !res.severeMonthly || !(res.severeMonthly > 0)) return '';
+        /* Revenue is linear in the rate, so the parity rate scales off whatever rate is set now.
+           The old version keyed it to res.flatCents, which only existed under the removed flat
+           structure; blendedTaxCents is the same quantity for the setting actually on screen. */
+        var parity = res.blendedTaxCents * res.avgMonthlyBill / res.severeMonthly;
+        return '<span class="wsub">The rate where the dividend stops being bill relief</span>' +
+          'At <strong>' + parity.toFixed(2) + '¢</strong> on every kWh, a severely burdened household in ' +
+          esc(r.name) + ' would receive about what it pays for electricity — ' +
+          fmtMoney(res.avgMonthlyBill) + ' a month ' + cite(r.billCit) + '. Below that the dividend is ' +
+          'bill relief; above it the surplus is a cash transfer, which is defensible but a different ' +
+          'policy.';
+      })() +
+      (priceCents !== null && r.residentialCents !== undefined
+        ? '<span class="wsub">And against what households already pay</span>' +
+          (priceCents + 6 < r.residentialCents
+            ? 'Even at 6¢ a data center here pays ' + (priceCents+6).toFixed(2) + '¢ — still below the ' +
+              r.residentialCents.toFixed(2) + '¢ households in ' + esc(r.name) + ' already pay ' +
+              cite('residential-price') + '.'
+            /* Plural here, and the count computed live: the region tool has several exceptions,
+               and a written-in number went stale once already when it grew from 14 regions to 24. */
+            : '<strong class="warn-inline">' + esc(r.name) + ' is one of the exceptions: at 6¢ a data center ' +
+              'here would pay ' + (priceCents+6).toFixed(2) + '¢, ABOVE the ' +
+              r.residentialCents.toFixed(2) + '¢ households already pay ' + cite('residential-price') +
+              '. The fairness comparison still holds in ' + sixCentHolds() + ' of the ' + REGION_ORDER.length +
+              ' regions, but not here.</strong>')
+        : '') +
       '<a class="jump" href="#gridIndexingAnchor">Change it in Section 4 ↑</a></div>';
 
-  /* ---- flat rate choice ---------------------------------------------- */
-  $('flatRateWrap').hidden = !isFlat;
-  var matchedC = res.matchedCents;
-  $('flatRateHint').innerHTML =
-    '<span class="wsub">Why this is not a fourth rate</span>' +
-    '<strong>Same as Differentiated</strong> (' + matchedC.toFixed(2) + '¢ here) is ' +
-    'what the Differentiated structure collects today, at this tier, expressed as one flat number ' +
-    'instead of two. It exists so the two structures can be compared like for like. It is derived from ' +
-    'this region\u2019s grid mix, so it differs by region, which is a strange thing to legislate ' +
-    cite('rate-flat') + '. <strong>A rate you pick</strong> is a slider instead, 0 to ' +
-    FLAT_RATE_MAX + '\u00a2, because a round number is what a statute would more plausibly say ' +
-    cite('rate-flat-options') + flagIf('rate-flat-options') + ' but the three that used to be the ' +
-    'only options missed the figure below in more than half the country, in both directions.' +
-    /* The point of the slider: find the rate at which the dividend stops being bill relief. The
-       tool already calls this the limit on the high end -- it could not be reached before. */
-    (function(){
-      if(!res.avgMonthlyBill || !res.severeMonthly || !(res.severeMonthly > 0) || !res.flatCents) return '';
-      var parity = res.flatCents * res.avgMonthlyBill / res.severeMonthly;
-      return '<span class="wsub">The rate where the dividend stops being bill relief</span>' +
-        'At <strong>' + parity.toFixed(2) + '\u00a2</strong> a severely burdened household in ' +
-        esc(r.name) + ' would receive about what it pays for electricity \u2014 ' +
-        fmtMoney(res.avgMonthlyBill) + ' a month ' + cite(r.billCit) + '. Below that the dividend is ' +
-        'bill relief; above it the surplus is a cash transfer, which is defensible but a different ' +
-        'policy. This is where the top of the range is set from, not by anything about the industry.' +
-        (parity < 1.5
-          ? ' Note it sits <strong>below 1.5\u00a2</strong>, the lowest rate this control used to offer.'
-          : (parity > 6 ? ' Note it sits <strong>above 6\u00a2</strong>, the highest rate this control used to offer.' : ''));
-    })() +
-    (priceCents !== null
-      ? ' <strong>Against ' + esc(r.name) + '\u2019s ' + priceCents.toFixed(2) + '¢ industrial price ' +
-        cite('industrial-price') + ':</strong> 1.5¢ adds ' + Math.round(1.5/priceCents*100) + '%, ' +
-        '3¢ adds ' + Math.round(3/priceCents*100) + '%, 6¢ adds ' + Math.round(6/priceCents*100) + '%. ' +
-        (r.residentialCents !== undefined
-          ? (priceCents + 6 < r.residentialCents
-              ? ' <strong>Even at 6¢ a data center here pays ' + (priceCents+6).toFixed(2) + '¢ — still ' +
-                'below the ' + r.residentialCents.toFixed(2) + '¢ households in ' + esc(r.name) +
-                ' already pay ' + cite('residential-price') + '.</strong>'
-              // Several regions break the comparison at 6c. Say so where it happens rather than
-              // letting the reader carry a claim that is false in front of them. The count of
-              // regions where it still HOLDS is computed live, never hardcoded -- it changed from
-              // 13 to 18 when the tool went from 14 regions to 24, and a written-in number would
-              // have quietly gone stale exactly then.
-              : ' <strong class="warn-inline">' + esc(r.name) + ' is one of the exceptions: at 6¢ a data center ' +
-                'here would pay ' + (priceCents+6).toFixed(2) + '¢, ABOVE the ' +
-                r.residentialCents.toFixed(2) + '¢ households already pay ' + cite('residential-price') +
-                '. The fairness comparison still holds in ' + sixCentHolds() + ' of the ' + REGION_ORDER.length +
-                ' regions, but not here.</strong>')
-          : '')
-      : '') +
-    '<span class="wsub">What caps the top end</span>' +
-    'The limit on the high end is not the industry, it is the household. A dividend can ' +
-    'exceed the bill it was meant to relieve, at which point the surplus is a cash transfer rather than ' +
-    'energy assistance — defensible, but a different policy, and the tool shows when you cross that line.';
 
   /* ---- CPI indexing ---------------------------------------------------- */
   $('taxYearsOut').textContent = state.taxYears === 0
@@ -5501,10 +5496,10 @@ function render(){
   })();
 
   $('gridIndexingHint').innerHTML =
-    (state.rateStructure === 'flat'
-      ? '<strong class="warn-inline">A flat rate is selected, so this choice does nothing at all.</strong> ' +
-        'Under a flat rate the fee base is metered kWh, which do not get cleaner, so there is no ' +
-        'grid-mix effect to index against. Switch back to Differentiated to use it. '
+    (ratioIsFlat()
+      ? '<strong class="warn-inline">The dial is at 1:1, so this choice does nothing at all.</strong> ' +
+        'At 1:1 the fee base is metered kWh, which do not get cleaner, so there is no ' +
+        'grid-mix effect to index against. Raise the ratio in Section 3 to use it. '
       /* The at-baseline notice lives in gridIndexingInert now -- beside the buttons, where the
          question gets asked, and carrying the control that answers it. Repeating it here was the
          same sentence twice on one page. */
@@ -5691,6 +5686,7 @@ function render(){
   var eligOpts = [
     { k:'burdened',   name:'Burdened households only'  },
     { k:'all-tiered', name:'Everyone, double for severe' },
+    { k:'all-halved', name:'Everyone, half for unburdened' },
     { k:'all-equal',  name:'Everyone, same amount'     }
   ];
   /* The button used to print only the SEVERE figure under a heading that said "Everyone", so a
@@ -5709,6 +5705,11 @@ function render(){
     if(k === 'all-tiered' && isFinite(a.severeMonthly) && isFinite(a.moderateMonthly))
       return who + ' · ' + fmtMoney(a.severeMonthly) + ' severe, ' +
              fmtMoney(a.moderateMonthly) + ' everyone else';
+    /* The fourth option reintroduced exactly the defect the comment above records fixing: it
+       printed the count alone, so two universal rules showed the same subtitle again. */
+    if(k === 'all-halved' && isFinite(a.severeMonthly) && isFinite(a.otherMonthly))
+      return who + ' · ' + fmtMoney(a.severeMonthly) + ' severe, ' +
+             fmtMoney(a.moderateMonthly) + ' moderate, ' + fmtMoney(a.otherMonthly) + ' others';
     return who;
   }
   function altElig(k){
@@ -5873,18 +5874,14 @@ function render(){
      NUMBERS; Structure decides how those numbers get charged to a kWh. This banner states the
      single number actually in effect BEFORE the reader has to parse two button groups to find it. */
   var tNow = TAX_TIERS[state.tier];
-  if(state.rateStructure === 'flat'){
+  if(ratioIsFlat()){
     $('oneTaxBanner').style.display = '';
     $('oneTaxBanner').innerHTML =
       '<span class="otlabel">This is one fee — one rate, on every kWh</span>' +
-      '<span class="otrate">' + res.flatCents.toFixed(2) + '¢/kWh</span> charged to <strong>all</strong> ' +
-      'charged electricity, fossil or clean alike. ' +
-      (state.flatRate === 'matched'
-        ? 'That number comes FROM the ' + tNow.label + ' tier below (' + tNow.fossilCents + '¢ fossil / ' +
-          tNow.renewCents + '¢ clean), pre-blended at ' + esc(r.name) + '\u2019s grid mix into one figure ' +
-          '— the tier is not a second, separate charge on top of this one; it IS this number, before blending.'
-        : 'The tier below is <strong>not used to compute it</strong> — ' + state.flatRate + '¢ replaces the ' +
-          'tier\u2019s numbers outright, which is why it is grayed out.');
+      '<span class="otrate">' + res.blendedTaxCents.toFixed(2) + '¢/kWh</span> charged to <strong>all</strong> ' +
+      'charged electricity, fossil or clean alike. The dial is at 1:1, so the fee slider’s two rates ' +
+      'have collapsed into this single number — it is not a second charge on top of them. ' +
+      '<a class="jump" href="#pickRatio">Raise the ratio ↑</a> to separate them again.';
   } else {
     /* No body text. Differentiated is the case that needs no explaining -- the tier's own two rates
        apply as printed, and they are already on the buttons directly below. Only the flat branch
@@ -6027,6 +6024,7 @@ function render(){
     }
     var picked = ({ 'burdened':'Burdened households only',
                     'all-tiered':'Everyone, double for severe',
+                    'all-halved':'Everyone, half for unburdened',
                     'all-equal':'Everyone, same amount' })[res.eligibility];
     $('eligNote').innerHTML =
       '<strong>' + picked + '</strong> is selected ' + cite('eligibility') + '. ' +
@@ -6419,6 +6417,16 @@ function render(){
                     'getting twice what everyone else gets ' + cite('ratio') + ' — comes to ';
       amountPhrase = fmtMoney(res.severeMonthly) + ' for a severely burdened household and ' +
                      fmtMoney(res.otherMonthly) + ' for everyone else';
+    }else if(res.eligibility === 'all-halved'){
+      /* The fourth rule pays three different amounts, so naming two of them would leave a reader
+         to assume the third group gets one of those. render-check caught this falling through to
+         the burdened wording, which said the money went to burdened households only. */
+      splitPhrase = fmtInt(r.households) + ' households — every household, with severely burdened ' +
+                    'ones getting twice the moderate amount ' + cite('ratio') + ' and unburdened ' +
+                    'ones half of it ' + cite('eligibility') + ' — comes to ';
+      amountPhrase = fmtMoney(res.severeMonthly) + ' for a severely burdened household, ' +
+                     fmtMoney(res.moderateMonthly) + ' for a moderately burdened one and ' +
+                     fmtMoney(res.otherMonthly) + ' for everyone else';
     }else{
       splitPhrase = fmtInt(res.severeHouseholds + res.moderateHouseholds) +
                     ' burdened households — severe households getting twice the moderate amount ' +
@@ -6447,7 +6455,10 @@ function render(){
       ? 'every household equally ' + cite('eligibility')
       : res.eligibility === 'all-tiered'
         ? 'every household, severe getting twice everyone else ' + cite('eligibility')
-        : 'burdened households, severe getting twice moderate ' + cite('ratio')) +
+        : res.eligibility === 'all-halved'
+          ? 'every household, severe getting twice moderate and unburdened households half ' +
+            cite('eligibility')
+          : 'burdened households, severe getting twice moderate ' + cite('ratio')) +
     ', then divided by 12 months ' + cite('months') + '.';
 
   $('interpretBody').innerHTML =
