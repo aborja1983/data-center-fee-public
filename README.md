@@ -23,16 +23,23 @@ control you can move, and show the source and confidence tier for each figure on
 The derivation scripts and the raw source documents are not in this repository — the model is
 developed in a separate working repository, where every figure is re-derived by running a script
 that must reproduce its committed output byte for byte. What is here lets you check a figure. It will not
-let you re-derive one. These four files cover the first of those:
+let you re-derive one. These five files cover the first of those:
 
 | file | what it gives you |
 |---|---|
-| **[MASTER-DATA.csv](MASTER-DATA.csv)** | 420 rows, one per figure displayed anywhere: its value, confidence tier, citation, caveats, and **the script that produced it**. Opens in a spreadsheet. Start here. |
+| **[MASTER-DATA-by-state.csv](MASTER-DATA-by-state.csv)** | 1,128 rows: every input behind the by-state figures, for all 51 jurisdictions, plus the national sums the headline numbers are built from. **Start here** — the figures quoted in prose are all by-state. Inputs only, so the arithmetic is yours to do. |
+| **[MASTER-DATA.csv](MASTER-DATA.csv)** | the same for the 24 grid regions: 420 rows, one per figure displayed anywhere, each with its value, confidence tier, citation, caveats, and **the script that produced it**. |
 | **[CITATIONS.md](CITATIONS.md)** · **[by state](CITATIONS-by-state.md)** | every number in each tool mapped to its source document and locator, plus what that number does in the model |
 | **[SOURCES.md](SOURCES.md)** | an inventory of every primary document the model is built on — publisher, size, and which figures derive from it |
 | **[METHODOLOGY.md](METHODOLOGY.md)** | how each figure is derived, end to end. Section 6 is a log of the errors this process caught, and what was done about each |
 
-The first three are not kept by hand. The two citation manifests are generated from the tools' own
+A note on the two CSVs, because the difference matters if you sum a column. Each carries two
+severe-household counts per jurisdiction: one applies the measured share to all households, the
+other is DOE LEAD's own count, computed on usable households only — LEAD excludes zero-income rows,
+so it runs 2-6% lower. Both are correct and they answer different questions. The national totals sum
+the first; each row says which method it used.
+
+The first four are not kept by hand. The two citation manifests are generated from the tools' own
 citation arrays and the inventory from the source tree, and an automated check fails if any of them
 stops matching what the pages display.
 
