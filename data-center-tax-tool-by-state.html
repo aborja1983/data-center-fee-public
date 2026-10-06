@@ -5574,7 +5574,11 @@ function renderNational(d, res){
   if(N.otherMonthly !== null && N.othW > 0)
     tiers.push(['Every other household', N.otherMonthly, N.othW]);
   el.innerHTML =
-    '<span class="wsub">The same fee, run in every state</span>' +
+    /* Renamed 2026-10-05. It read "The same fee, run in every state", which never contains the
+   word a reader scanning for this block is looking for -- the project owner could not find it
+   on the page while the figure was on screen. The body already said "nationally"; the heading
+   now does too. */
+    '<span class="wsub">The national total \u2014 the same fee in every state</span>' +
     'Charging these settings in all <strong>' + d.n + '</strong> jurisdictions at once raises ' +
     dn('<strong>' + fmtBigMoney(N.revenue) + '</strong> a year', 'national') + ' nationally, paid to ' +
     '<strong>' + fmtInt(N.recipients) + '</strong> households' +

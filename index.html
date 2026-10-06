@@ -5315,6 +5315,31 @@ function paintAnswer(){
        : tail === 'low' ? ' <strong>This is one of the extremes</strong>, ' +
           (mine < 0.005 ? 'with no tracked projects, so the fee raises nothing here.' : 'with little tracked buildout against many struggling households.')
        : '') + '</p>');
+    /* THE NATIONAL TOTAL. Guarded on d.national EXISTING, never on which model is loaded: the
+       region core does not produce it at all, because 24 RTO and utility territories overlap and
+       summing them would double-count households and miss others. Checking the mode name instead
+       would be a second source of truth for the same fact, and the two would drift. */
+    if(d.national && d.national.revenue > 0){
+      var N = d.national;
+      var who = [];
+      who.push('<strong>' + money(N.severeMonthly*12) + ' a year</strong> to each of the ' +
+               intf(N.severeHH) + ' households spending more than a tenth of their income on energy');
+      if(N.moderateMonthly !== null && N.modW > 0)
+        who.push('<strong>' + money(N.moderateMonthly*12) + '</strong> to the ' + intf(N.moderateHH) +
+                 ' spending 6\u201310%');
+      if(N.otherMonthly !== null && N.othW > 0)
+        who.push('<strong>' + money(N.otherMonthly*12) + '</strong> to the ' + intf(N.otherHH) + ' others');
+      parts.push('<h3>Nationally</h3><p>Charging these same settings in all ' + d.n +
+        ' states and DC at once would raise <strong>' + bigMoney(N.revenue) + ' a year</strong>, ' +
+        'paid to ' + intf(N.recipients) + ' households: ' + who.join('; ') + '.' +
+        /* The pooling assumption, stated where the figure is, because it is the thing a reader
+           would otherwise assume away: this total only reaches a household in a state with no
+           data centers if the money crosses state lines. */
+        (N.zeroStates && N.zeroStates.length
+          ? ' That assumes one national fund. ' + nameList(N.zeroStates) +
+            ' raise nothing at these settings and would receive nothing if each state kept only what it collected.'
+          : '') + '</p>');
+    }
     parts.push('<h3>For scale</h3><p>LIHEAP, the main federal energy assistance program, pays an ' +
       'average of <strong>' + money(LIHEAP_MONTHLY) + ' a month</strong> and reaches about one ' +
       'eligible household in six. Comparing averages, the figure above is <strong>' +
