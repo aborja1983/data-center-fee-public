@@ -103,6 +103,19 @@ p.sub{color:var(--ink-2);margin:0 0 22px;font-size:1rem}
 .readout .unit{font-size:1rem;font-weight:400;color:var(--ink-2);margin-left:4px}
 .caption{color:var(--ink-3);font-size:.86rem;margin:0}
 /* The page is fully keyboard-navigable and showed nothing at all when tabbed through. */
+/* The national strip: a full-width control that states the total and says it opens the detail.
+   Deliberately not a card beside the household figures -- it is a different quantity (money in,
+   not money out to one household) and sitting it in that row invited reading it as a third tier. */
+#natStrip{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;width:100%;
+  margin:14px 0 0;padding:13px 16px;text-align:left;cursor:pointer;
+  background:var(--accent-soft);border:1px solid var(--accent);border-radius:10px;
+  color:inherit;font:inherit}
+#natStrip:hover{filter:brightness(1.08)}
+#natStrip .natlab{font-size:.84rem;color:var(--ink-3)}
+#natStrip .natfig{font-size:1.45rem;font-weight:700;letter-spacing:-.02em;color:var(--accent);
+  font-variant-numeric:tabular-nums}
+#natStrip .natcue{margin-left:auto;font-size:.8rem;color:var(--ink-3);white-space:nowrap}
+@media (max-width:560px){ #natStrip .natcue{margin-left:0} }
 a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--accent);
   outline-offset:2px;border-radius:6px}
 input[type=range]{width:100%;margin:14px 0 6px;accent-color:var(--accent)}
@@ -278,7 +291,10 @@ footer a{color:var(--ink-2)}
   <div id="scenarioBanner" class="scenario" hidden></div>
   <h2 class="q" id="answerHead">What a household would receive</h2>
   <div id="answer" class="two"></div>
-  <div class="frame" id="frameBox"></div>
+    <!-- The national total, one click from the household figure. It was reachable only by
+         reading to the third paragraph of the frame below, which is how it got missed. -->
+    <button type="button" id="natStrip" hidden></button>
+    <div class="frame" id="frameBox"></div>
   <div class="frame" id="decarbBox" hidden></div>
   <p class="note" id="deeper"></p>
   <div id="printFoot" aria-hidden="true"></div>
@@ -5288,6 +5304,25 @@ function paintAnswer(){
   document.getElementById('answer').innerHTML = cards.join('') ||
     '<p class="caption">No household in this jurisdiction falls in the eligible group at this setting.</p>';
 
+  /* The national strip. Filled from the same headlineDistribution call the frame below uses, and
+     shown only when that call produced a national block -- the region core does not, because its
+     24 territories overlap. Clicking scrolls to the paragraph that breaks it down, so the figure
+     is one click from the household answer instead of three paragraphs into the frame. */
+  (function(){
+    var strip = document.getElementById('natStrip');
+    if(!strip) return;
+    var dn = headlineDistribution(input());
+    var N = dn && dn.national;
+    if(!N || !(N.revenue > 0)){ strip.hidden = true; return; }
+    strip.hidden = false;
+    strip.innerHTML =
+      '<span class="natlab">Run this in all ' + dn.n + ' states and DC</span>' +
+      '<span class="natfig">' + bigMoney(N.revenue) + ' a year</span>' +
+      '<span class="natcue">see who gets what \u2193</span>';
+    strip.setAttribute('aria-label',
+      'Nationally this raises ' + bigMoney(N.revenue) + ' a year. Opens the breakdown below.');
+  })();
+
   /* Where this sits, and what it is worth against the one program people know. Both computed. */
   var d = headlineDistribution(input());
   var mine = x.severePayable ? x.severeMonthly : x.moderateMonthly;
@@ -5329,7 +5364,7 @@ function paintAnswer(){
                  ' spending 6\u201310%');
       if(N.otherMonthly !== null && N.othW > 0)
         who.push('<strong>' + money(N.otherMonthly*12) + '</strong> to the ' + intf(N.otherHH) + ' others');
-      parts.push('<h3>Nationally</h3><p>Charging these same settings in all ' + d.n +
+      parts.push('<h3 id="natHead">Nationally</h3><p>Charging these same settings in all ' + d.n +
         ' states and DC at once would raise <strong>' + bigMoney(N.revenue) + ' a year</strong>, ' +
         'paid to ' + intf(N.recipients) + ' households: ' + who.join('; ') + '.' +
         /* The pooling assumption, stated where the figure is, because it is the thing a reader
@@ -5539,6 +5574,14 @@ document.title = CFG.title;
 document.querySelector('.brand').textContent = CFG.brand;
 document.getElementById('search').placeholder = CFG.searchPlaceholder;
 document.getElementById('openingSub').textContent = CFG.openingSub;
+/* The strip scrolls to its own breakdown rather than toggling anything: the paragraph is already
+   on the page, and hiding it behind the strip would mean two places that can disagree about
+   whether it is visible. */
+document.getElementById('natStrip').addEventListener('click', function(){
+  var h = document.getElementById('natHead');
+  if(!h) return;
+  h.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
 useModel(CFG.firstMode);
 paintChrome();
 paintPlaces('');
