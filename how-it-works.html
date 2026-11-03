@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How the data center fee would work</title>
+<style>
+:root{--bg:#f7f7f5;--surface:#fff;--ink:#1a1a17;--body:#2A3550;--muted:#57564f;--accent:#2f6f4e;--accent-soft:#e7f0ea;--warn:#8a5a00;--warnbg:#fdf3e0;--rule:#e2e1db}
+@media (prefers-color-scheme:dark){:root{--bg:#16171a;--surface:#1e2024;--ink:#eceae4;--body:#D5DCE8;--muted:#a8a69f;--accent:#6cc39a;--accent-soft:#1d3029;--warn:#e8bd6e;--warnbg:#2e2718;--rule:#31343a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--body);font:16px/1.55 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.banner{background:var(--warnbg);color:var(--warn);padding:10px 16px;text-align:center;font-size:14px;font-weight:600;border-bottom:1px solid var(--rule)}
+nav.top{max-width:1000px;margin:0 auto;padding:12px 16px 0;font-size:14px;display:flex;flex-wrap:wrap;gap:14px}
+nav.top a{color:var(--accent);text-decoration:none;font-weight:600}
+main{max-width:1000px;margin:0 auto;padding:22px 16px 64px;display:grid;gap:22px}
+h1{font-family:Cambria,Georgia,serif;color:var(--ink);font-size:clamp(26px,4vw,34px);margin:0}
+h2{font-family:Cambria,Georgia,serif;color:var(--ink);font-size:20px;margin:0 0 8px}
+p{margin:0;max-width:70ch}
+.card{background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:16px 18px}
+.steps{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.steps .card b{display:block;color:var(--accent);font-size:13px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px}
+.links{display:flex;flex-wrap:wrap;gap:10px}
+.links a{display:inline-block;background:var(--accent);color:#fff;text-decoration:none;font-weight:600;border-radius:999px;padding:9px 16px;font-size:14px}
+.links a.alt{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+figure{margin:0;background:var(--surface);border:1px solid var(--rule);border-radius:10px;padding:10px}
+figure img{width:100%;height:auto;display:block;border-radius:6px;background:#fff}
+figcaption{font-size:14px;color:var(--muted);padding:8px 4px 2px}
+.note{font-size:14px;color:var(--muted)}
+a.inline{color:var(--accent);font-weight:600}
+</style></head><body>
+<div class="banner">Draft for discussion. Fund return and payout rate are modeling dials, not sourced figures (NEEDS SOURCE). Anaïs Borja, The New Compact Project.</div>
+<nav class="top">
+  <a href="index.html">Simple view</a>
+  <a href="data-center-tax-tool-by-state.html">Full model (by state)</a>
+  <a href="data-center-tax-tool.html">By region</a>
+  <a href="fund-model.html">Dividend + public fund</a>
+</nav>
+<main>
+  <header style="display:grid;gap:8px">
+    <h1>How the data center fee would work</h1>
+    <p>A fee on electricity used by data centers, collected through utilities into a Treasury trust fund, paid back to households by energy burden, with the rest building a public fund. Two pieces: the design (below) and the working models (linked).</p>
+  </header>
+
+  <section class="steps" aria-label="The three steps">
+    <div class="card"><b>1 · Collect</b>Data centers pay the fee on their electricity bill; utilities send it to a Treasury trust fund. Off-grid data centers file and pay directly.</div>
+    <div class="card"><b>2 · Pay households</b>A share goes to households, scaled by energy burden, as a bill credit or a check.</div>
+    <div class="card"><b>3 · Build the fund</b>The rest fills a reserve, then a permanent fund. In the design, its interest pays for a Grid for Growth Fund.</div>
+  </section>
+
+  <div class="card">
+    <h2>Try the numbers</h2>
+    <p>Three interactive models, built on the same public data:</p>
+    <div class="links" style="margin-top:12px">
+      <a href="data-center-tax-tool-by-state.html">Full model, by state</a>
+      <a class="alt" href="data-center-tax-tool.html">By grid region</a>
+      <a class="alt" href="fund-model.html">Dividend + public fund</a>
+      <a class="alt" href="index.html">Simple view</a>
+    </div>
+    <p class="note" style="margin-top:12px">The fund model and the design differ in one place. The design routes revenue through a stabilization reserve and a permanent corpus whose interest funds a Grid for Growth Fund. The fund model offers two simpler choices, spend the fund each year or run it as an endowment, and splits it across four priorities you set.</p>
+  </div>
+
+  <h2 style="margin-top:6px">The design, slide by slide</h2>
+  <figure><img src="slides/s-1.png" alt="How the money moves: one monthly cycle from data center to utility to Treasury trust fund to households, then household dividend, stabilization reserve, permanent corpus and Grid for Growth Fund"><figcaption>1 · How the money moves</figcaption></figure>
+  <figure><img src="slides/s-2.png" alt="What data moves, and when, between operators, utilities, households and Treasury"><figcaption>2 · What data moves, and when</figcaption></figure>
+  <figure><img src="slides/s-3.png" alt="Two flows that do not wait on each other: fee flow up to Treasury and credit flow down to households"><figcaption>3 · Two flows that do not wait on each other</figcaption></figure>
+  <figure><img src="slides/s-4.png" alt="A precedent: the Nuclear Waste Fund"><figcaption>4 · A precedent: utilities paying into a federal fund</figcaption></figure>
+  <figure><img src="slides/s-5.png" alt="Design summary table: proposed design and precedents"><figcaption>5 · Design summary. Precedents marked † were checked against a source; unmarked ones were not and should be checked before presenting.</figcaption></figure>
+  <figure><img src="slides/s-6.png" alt="Rollout in four phases"><figcaption>6 · Rollout: four phases</figcaption></figure>
+  <p class="note">Slides from "money and data flow," Oct. 5, 2026. The 60% household share, reserve cap and other settings are design choices, not findings.</p>
+</main>
+</body></html>
